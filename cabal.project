@@ -1,0 +1,26 @@
+-- cabal.project
+
+packages: .
+
+-- Optional: specify additional packages
+-- packages: ./path/to/another/package
+
+-- Optional: specify package repositories
+-- repository hackage.haskell.org
+--   url: https://hackage.haskell.org/
+
+-- Optional: specify compiler options
+-- with-compiler: ghc-8.10.4
+with-compiler: ghc-9.2.8
+
+-- Optional: specify build options
+-- builddir: dist-newstyle
+
+-- Optional: specify constraints
+-- constraints: some-package == 1.0.0
+
+-- Optional: specify flags
+-- flags: +some-flag
+
+-- Optional: specify extra source files
+-- extra-source-files: README.md, CHANGELOG.md
