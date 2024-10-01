@@ -76,3 +76,17 @@ executable heftia-study
 
     -- Base language which the package is written in.
     default-language: GHC2021
+
+    default-extensions:
+        LambdaCase,
+        DerivingStrategies,
+        DataKinds,
+        TypeFamilies,
+        BlockArguments,
+        FunctionalDependencies,
+        RecordWildCards,
+        DefaultSignatures,
+        PatternSynonyms,
+        TemplateHaskell,
+        PartialTypeSignatures,
+        AllowAmbiguousTypes
