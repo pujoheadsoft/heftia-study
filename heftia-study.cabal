@@ -70,7 +70,8 @@ executable heftia-study
     build-depends: base ==4.16.4.0,
                    heftia-effects ^>= 0.3.1,
                    ghc-typelits-knownnat ^>= 0.7,
-                   text
+                   text,
+                   time
 
     -- Directories containing source files.
     hs-source-dirs:   app
