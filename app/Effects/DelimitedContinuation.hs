@@ -37,10 +37,10 @@ program =
     . runForkSingle
     . interpretRecH (applyResetFork 4)
     $ do
-        liftIO . putStrLn . (("[out of scope] " ++) . show) =<< fork
+        liftIO . putStrLn . (("[スコープ外] " ++) . show) =<< fork
         s <- resetFork $ do
           fid1 <- fork
           fid2 <- fork
-          liftIO $ putStrLn $ "[delimited continuation of `fork`] Fork ID: " ++ show (fid1, fid2)
+          liftIO $ putStrLn $ "[`fork`の限定継続] Fork ID: " ++ show (fid1, fid2)
           pure $ show (fid1, fid2)
-        liftIO $ putStrLn $ "scope exited. result: " ++ s
+        liftIO $ putStrLn $ "スコープの終了. " ++ s
