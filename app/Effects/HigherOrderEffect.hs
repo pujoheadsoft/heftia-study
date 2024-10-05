@@ -2,8 +2,8 @@ module Effects.HigherOrderEffect where
 
 import Control.Category ((>>>))
 import Control.Effect (type (<:), type (<<:), type (~>))
-import Control.Effect.ExtensibleFinal (type (:!!))
-import Control.Effect.Hefty (interposeRec, interposeRecH, interpretRec, interpretRecH, raise, raiseH, runEff)
+import Control.Effect.ExtensibleFinal (type (:!!), type (!!))
+import Control.Effect.Hefty (interposeRec, interposeRecH, interpretRec, interpretRecH, raise, raiseH, runEff, reinterpretRecH, Elab, raiseUnder, subsume)
 import Control.Effect.Interpreter.Heftia.Reader (runReader)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Effect.Reader (LAsk, Local, ask, local)
@@ -14,6 +14,11 @@ import Data.Text (Text, pack, unpack)
 import Data.Text qualified as T
 import Data.Text.IO qualified as T
 import Data.Time (UTCTime, defaultTimeLocale, formatTime, getCurrentTime)
+import Data.Free.Sum (type (+))
+import Control.Effect.Interpreter.Heftia.State (evalState)
+import Data.Effect.State (modify, get)
+import Control.Monad (when)
+import Data.Function ((&))
 
 data Log a where
   Logging :: Text -> Log ()
@@ -92,32 +97,34 @@ runDymmyFS = interpretRec \case
 {-
   <<| は <| の高階版
   raise:  一階エフェクトリストの先頭に新たな任意のエフェクトを追加
-          eh :!! ef ~> eh :!! e ': ef
+             eh :!! ef
+          ~> eh :!! e ': ef
 
   raiseH: 高階エフェクトリストの先頭に新たな任意のエフェクトを追加
-          eh :!! ef ~> e ': eh :!! ef
+                  eh :!! ef
+          ~> e ': eh :!! ef
 -}
 saveLogChunk ::
   forall eh ef.
   (LogChunk <<| eh, Log <| ef, FileSystem <| ef, Time <| ef, ForallHFunctor eh) =>
   eh :!! ef ~> eh :!! ef
 saveLogChunk =
-  raise        -- 引数の eh :!! ef が eh :!! (e1 ': ef) になる。(efに任意のe1が加わってる)
-    >>> raiseH -- 引数の eh :!! (e ': ef) が (e2 ': eh) :!! (e1 ': ef) になる。(ehに任意のe2が加わっている)
+  raise        -- 引数の eh :!! ef が eh :!! (e1 ': ef) になる。(efに任意のエフェクトe1が加わってる)
+    >>> raiseH -- 引数の eh :!! (e ': ef) が (e2 ': eh) :!! (e1 ': ef) になる。(ehに任意のエフェクトe2が加わっている)
     >>> hookCreateDirectory -- hooksCreateDirectoryの引数と返り値の型は丁度↑の型になっている。
     >>> hookWriteFile       -- hookWriteFileの引数も同様
     >>> runReader @FilePath "./log/"
   where
     hookCreateDirectory ::
-      (Local FilePath ': eh :!! LAsk FilePath ': ef)
-        ~> (Local FilePath ': eh :!! LAsk FilePath ': ef)
+      (Local FilePath ': eh :!! LAsk FilePath ': ef)      -- LocalはReader系エフェクトの高階なlocalエフェクトに対応する型
+        ~> (Local FilePath ': eh :!! LAsk FilePath ': ef) -- Askは一階なaskエフェクトに対応する型
     hookCreateDirectory =
       interposeRecH \(LogChunk chunkName a) -> logChunk chunkName do
-        chungBegingAt <- currentTime
-        let dirName = unpack $ iso8601 chungBegingAt <> pack "-" <> chunkName
-        local @FilePath (++ dirName ++ "/") do
-          logChunkPath <- ask
-          mkdir logChunkPath
+        chungBegingAt <- currentTime -- 一階のエフェクトリストefにTimeがあるからcurrentTimeが使える
+        let dirName = unpack $ iso8601 chungBegingAt <> pack "-" <> chunkName -- Chunk名と現在時刻からディレクトリ名を作る
+        local @FilePath (++ dirName ++ "/") do -- localは高階な操作なのでエフェクトを引数にとる
+          logChunkPath <- ask                  -- 一階のエフェクトリストefにLAskがあるからaskが使える
+          mkdir logChunkPath                   -- 一階のエフェクトリストefにFileSystemがあるからmkDirが使える
           a
 
     hookWriteFile ::
@@ -129,3 +136,77 @@ saveLogChunk =
         logAt <- currentTime
         writeToFile (unpack $ pack logChunkPath <> iso8601 logAt <> pack ".log") (unpack msg)
         logging msg
+
+{-
+  !! や + は :!! が型レベルリストを使うのに対する代替の記法
+  eh や ef や r といった多相化されたリストの型変数が出現しない場合こう書ける
+-}
+runApp :: LogChunk !! FileSystem + Time + Log + IO ~> IO
+runApp =
+  runLogChunk
+    >>> runDymmyFS
+    >>> logWithTime
+    >>> timeToIO
+    >>> logToIO
+    >>> runEff
+
+program2 :: IO ()
+program2 = runApp . saveLogChunk $ logExample
+------------------------------------------------
+{-
+  スコープ内でログがn回以上投げられた場合、n回以降は省略し、省略されたことをログに出すという再解釈を行うフック
+-}
+limitLogChunk
+ :: Log <| ef
+ => Int
+ -> '[LogChunk] :!! LLog ': ef
+ ~> '[LogChunk] :!! LLog ': ef
+limitLogChunk n = reinterpretRecH $ elabLimitLogChunk n
+
+{-
+  raiseUnder: エフェクトリストの先頭の一つ下に新たな任意のエフェクト型を挿入する
+                 eh :!! e1 ': ef
+              ~> eh :!! e1 ': e2 ef
+
+  Elab e f: これは e f ~> f の型シノニム
+            この例だと
+            Elab LogChunk ('[LogChunk] :!! LLog ': ef) は
+            LogChunk ('[LogChunk] :!! LLog ': ef) ~> ('[LogChunk] :!! LLog ': ef)
+            と同じ
+-}
+elabLimitLogChunk
+  :: Log <| ef
+  => Int
+  -> Elab LogChunk ('[LogChunk] :!! LLog ': ef)
+elabLimitLogChunk n (LogChunk name a) =
+  logChunk name do
+    raise . raiseH $ limitLog $ runLogChunk $ limitLogChunk n a
+  where
+    limitLog
+      :: Log <| ef
+      => '[] :!! LLog ': ef
+      ~> '[] :!! ef
+    limitLog a' =
+      -- 初期値0でStateエフェクトをハンドル
+      evalState @Int 0 $
+        -- エフェクトの干渉を防ぐためinterposeRecではなく、interpretRecを使っている
+        raiseUnder a' & interpretRec \(Logging msg) -> do
+          count <- get
+          when (count < n) do -- 条件を満たすときだけログ出力
+            logging msg
+            when (count == n - 1) do -- limitまできたらログ出力
+              logging $ pack "Subsequent logs are ommited..."
+            
+            modify @Int (+ 1) -- インクリメント
+
+{-
+  subsume: 先頭のエフェクトをそれよりも下位へと送信する
+
+  subsume
+    :: (e <| ef, ForallHFunctor eh)
+    => eh :!! LiftIns e ': ef
+    ~> eh :!! ef
+  subsume = interpretRec sendIns
+-}
+program3 :: IO ()
+program3 = runApp . subsume . limitLogChunk 2 $ logExample
