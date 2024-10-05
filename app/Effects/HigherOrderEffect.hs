@@ -43,7 +43,7 @@ timeToIO = interpretRec \CurrentTime -> liftIO getCurrentTime
 logWithTime :: (Log <| ef, Time <| ef, ForallHFunctor eh) => eh :!! ef ~> eh :!! ef
 logWithTime = interposeRec \(Logging msg) -> do
   t <- currentTime
-  logging $ pack "[" <> iso8601 t <> pack "]" <> msg
+  logging $ pack "[" <> iso8601 t <> pack "] " <> msg
 
 iso8601 :: UTCTime -> Text
 iso8601 t = T.take 23 (pack $ formatTime defaultTimeLocale "%FT%T.%q" t) <> pack "Z"
@@ -90,8 +90,8 @@ makeEffectF [''FileSystem]
 
 runDymmyFS :: (IO <| r, ForallHFunctor eh) => eh :!! LFileSystem ': r ~> eh :!! r
 runDymmyFS = interpretRec \case
-  Mkdir path -> liftIO $ putStrLn $ "<runDummyFS> mkdir " <> path
-  WriteToFile path content -> liftIO $ putStrLn $ "<runDummyFS> writeToTile" <> path <> " : " <> content
+  Mkdir path -> liftIO $ putStrLn $ "<runDummyFS> mkdir: " <> path
+  WriteToFile path content -> liftIO $ putStrLn $ "<runDummyFS> writeToTile: " <> path <> " : " <> content
 
 -----------------------------------
 {-
