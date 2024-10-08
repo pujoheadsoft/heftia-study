@@ -31,8 +31,9 @@ data ResetFork f a where
 makeEffectH [''ResetFork]
 
 {-
-  ResetFork の elaboration射(一階はハンドラというが高階の場合elaboratiionと呼ぶ)
+  ResetFork の elaborator(一階はハンドラというが高階の場合elaboratorと呼ぶ)
   interposeK: 限定継続の取り出しを行う
+  別のelaboratorを作ればfork戦略を変えることができる(どのようにforkするかを変えられる)
 -}
 applyResetFork :: Fork <| r => Int -> Elab ResetFork ('[] :!! r)
 applyResetFork numberOfFork (ResetFork m) =
