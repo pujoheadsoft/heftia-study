@@ -11,7 +11,7 @@ packages: .
 
 -- Optional: specify compiler options
 -- with-compiler: ghc-8.10.4
-with-compiler: ghc-9.2.8
+with-compiler: ghc-9.6.6
 
 -- Optional: specify build options
 -- builddir: dist-newstyle

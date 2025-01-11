@@ -1,11 +1,6 @@
 module Effects.DelimitedContinuation where
-import Data.Effect.TH (makeEffectF, makeEffectH)
-import Data.Hefty.Extensible (ForallHFunctor, type (<|))
-import Control.Effect.ExtensibleFinal ((:!!))
-import Control.Effect (type (~>))
-import Control.Effect.Hefty (interpretRec, Elab, interposeK, runEff, interpretRecH)
-import Data.Function ((&))
-import Control.Monad.IO.Class (liftIO)
+
+import Control.Monad.Hefty
 {-
   限定継続 (delimited continuation)
 -}
@@ -18,8 +13,8 @@ data Fork a where
 
 makeEffectF [''Fork]
 
-runForkSingle :: ForallHFunctor eh => eh :!! LFork ': r ~> eh :!! r
-runForkSingle = interpretRec \Fork -> pure 0
+runForkSingle :: eh :!! Fork ': r ~> eh :!! r
+runForkSingle = interpret \Fork -> pure 0
 --------------------------------------------
 {-
    分岐の範囲をスコープで区切って限定するための高階エフェクト
@@ -34,10 +29,12 @@ makeEffectH [''ResetFork]
   ResetFork の elaborator(一階はハンドラというが高階の場合elaboratorと呼ぶ)
   interposeK: 限定継続の取り出しを行う
   別のelaboratorを作ればfork戦略を変えることができる(どのようにforkするかを変えられる)
+
+  v0.3系では interposeK pure \resume Fork と書いていた
 -}
-applyResetFork :: Fork <| r => Int -> Elab ResetFork ('[] :!! r)
+applyResetFork :: Fork <| r => Int -> ResetFork ~~> '[] :!! r
 applyResetFork numberOfFork (ResetFork m) =
-  m & interposeK pure \resume Fork -> do
+  m & interposeBy pure \Fork resume -> do
     -- 取り出した限定継続resumeを1からnumberOfForkにかけて呼び出し
     r <- mapM resume [1 .. numberOfFork]
     -- 各々の継続の結果をmconcatで結合して返す
@@ -47,7 +44,7 @@ program :: IO ()
 program =
   runEff
     . runForkSingle
-    . interpretRecH (applyResetFork 4)
+    . interpretH (applyResetFork 4)
     $ do
         liftIO . putStrLn . (("[スコープ外] " ++) . show) =<< fork
         -- ここからが分岐のスコープ

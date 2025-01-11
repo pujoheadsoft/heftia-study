@@ -1,32 +1,25 @@
 module Effects.HigherOrderEffect where
 
+import Control.Monad.Hefty
 import Control.Category ((>>>))
-import Control.Effect (type (<:), type (<<:), type (~>))
-import Control.Effect.ExtensibleFinal (type (:!!), type (!!))
-import Control.Effect.Hefty (interposeRec, interposeRecH, interpretRec, interpretRecH, raise, raiseH, runEff, reinterpretRecH, Elab, raiseUnder, subsume)
-import Control.Effect.Interpreter.Heftia.Reader (runReader)
-import Control.Monad.IO.Class (MonadIO, liftIO)
-import Data.Effect.Reader (LAsk, Local, ask, local)
-import Data.Effect.TH (makeEffectF, makeEffectH)
-import Data.Hefty.Extensible (ForallHFunctor, type (<<|), type (<|))
-import Data.Kind (Type)
+import Control.Monad.IO.Class (MonadIO)
+import Data.Effect.Reader (Local, ask, local)
 import Data.Text (Text, pack, unpack)
 import Data.Text qualified as T
 import Data.Text.IO qualified as T
 import Data.Time (UTCTime, defaultTimeLocale, formatTime, getCurrentTime)
-import Data.Free.Sum (type (+))
-import Control.Effect.Interpreter.Heftia.State (evalState)
 import Data.Effect.State (modify, get)
 import Control.Monad (when)
-import Data.Function ((&))
+import Control.Monad.Hefty.Reader (Ask, runReader)
+import Control.Monad.Hefty.State (evalState)
 
 data Log a where
   Logging :: Text -> Log ()
 
 makeEffectF [''Log]
 
-logToIO :: (IO <| r, ForallHFunctor eh) => eh :!! LLog ': r ~> eh :!! r
-logToIO = interpretRec \(Logging msg) -> liftIO $ T.putStrLn msg
+logToIO :: (IO <| r) => eh :!! Log ': r ~> eh :!! r
+logToIO = interpret \(Logging msg) -> liftIO $ T.putStrLn msg
 
 ---------------------------------------------------------
 
@@ -35,13 +28,13 @@ data Time a where
 
 makeEffectF [''Time]
 
-timeToIO :: (IO <| r, ForallHFunctor eh) => eh :!! LTime ': r ~> eh :!! r
-timeToIO = interpretRec \CurrentTime -> liftIO getCurrentTime
+timeToIO :: (IO <| r) => eh :!! Time ': r ~> eh :!! r
+timeToIO = interpret \CurrentTime -> liftIO getCurrentTime
 
 ---------------------------------------------------------
 
-logWithTime :: (Log <| ef, Time <| ef, ForallHFunctor eh) => eh :!! ef ~> eh :!! ef
-logWithTime = interposeRec \(Logging msg) -> do
+logWithTime :: (Log <| ef, Time <| ef) => eh :!! ef ~> eh :!! ef
+logWithTime = interpose \(Logging msg) -> do
   t <- currentTime
   logging $ pack "[" <> iso8601 t <> pack "] " <> msg
 
@@ -62,8 +55,8 @@ data LogChunk f (a :: Type) where
 
 makeEffectH [''LogChunk]
 
-runLogChunk :: (ForallHFunctor eh) => LogChunk ': eh :!! ef ~> eh :!! ef
-runLogChunk = interpretRecH \(LogChunk _ m) -> m
+runLogChunk :: LogChunk ': eh :!! ef ~> eh :!! ef
+runLogChunk = interpretH \(LogChunk _ m) -> m
 
 logExample :: (LogChunk <<: m, Log <: m, MonadIO m) => m ()
 logExample = do
@@ -88,8 +81,8 @@ data FileSystem a where
 
 makeEffectF [''FileSystem]
 
-runDymmyFS :: (IO <| r, ForallHFunctor eh) => eh :!! LFileSystem ': r ~> eh :!! r
-runDymmyFS = interpretRec \case
+runDymmyFS :: (IO <| r) => eh :!! FileSystem ': r ~> eh :!! r
+runDymmyFS = interpret \case
   Mkdir path -> liftIO $ putStrLn $ "<runDummyFS> mkdir: " <> path
   WriteToFile path content -> liftIO $ putStrLn $ "<runDummyFS> writeToTile: " <> path <> " : " <> content
 
@@ -106,7 +99,7 @@ runDymmyFS = interpretRec \case
 -}
 saveLogChunk ::
   forall eh ef.
-  (LogChunk <<| eh, Log <| ef, FileSystem <| ef, Time <| ef, ForallHFunctor eh) =>
+  (LogChunk <<| eh, Log <| ef, FileSystem <| ef, Time <| ef) =>
   eh :!! ef ~> eh :!! ef
 saveLogChunk =
   raise        -- 引数の eh :!! ef が eh :!! (e1 ': ef) になる。(efに任意のエフェクトe1が加わってる)
@@ -116,10 +109,10 @@ saveLogChunk =
     >>> runReader @FilePath "./log/"
   where
     hookCreateDirectory ::
-      (Local FilePath ': eh :!! LAsk FilePath ': ef)      -- LocalはReader系エフェクトの高階なlocalエフェクトに対応する型
-        ~> (Local FilePath ': eh :!! LAsk FilePath ': ef) -- Askは一階なaskエフェクトに対応する型
+      (Local FilePath ': eh :!! Ask FilePath ': ef)      -- LocalはReader系エフェクトの高階なlocalエフェクトに対応する型
+        ~> (Local FilePath ': eh :!! Ask FilePath ': ef) -- Askは一階なaskエフェクトに対応する型
     hookCreateDirectory =
-      interposeRecH \(LogChunk chunkName a) -> logChunk chunkName do
+      interposeH \(LogChunk chunkName a) -> logChunk chunkName do
         chungBegingAt <- currentTime -- 一階のエフェクトリストefにTimeがあるからcurrentTimeが使える
         let dirName = unpack $ iso8601 chungBegingAt <> pack "-" <> chunkName -- Chunk名と現在時刻からディレクトリ名を作る
         local @FilePath (++ dirName ++ "/") do -- localは高階な操作なのでエフェクトを引数にとる
@@ -128,10 +121,10 @@ saveLogChunk =
           a
 
     hookWriteFile ::
-      (Local FilePath ': eh :!! LAsk FilePath ': ef)
-        ~> (Local FilePath ': eh :!! LAsk FilePath ': ef)
+      (Local FilePath ': eh :!! Ask FilePath ': ef)
+        ~> (Local FilePath ': eh :!! Ask FilePath ': ef)
     hookWriteFile =
-      interposeRec \(Logging msg) -> do
+      interpose \(Logging msg) -> do
         logChunkPath <- ask
         logAt <- currentTime
         writeToFile (unpack $ pack logChunkPath <> iso8601 logAt <> pack ".log") (unpack msg)
@@ -159,38 +152,45 @@ program2 = runApp . saveLogChunk $ logExample
 limitLogChunk
  :: Log <| ef
  => Int
- -> '[LogChunk] :!! LLog ': ef
- ~> '[LogChunk] :!! LLog ': ef
-limitLogChunk n = reinterpretRecH $ elabLimitLogChunk n
+ -> '[LogChunk] :!! Log ': ef
+ ~> '[LogChunk] :!! Log ': ef
+limitLogChunk n = reinterpretH $ elabLimitLogChunk n
 
 {-
   raiseUnder: エフェクトリストの先頭の一つ下に新たな任意のエフェクト型を挿入する
                  eh :!! e1 ': ef
               ~> eh :!! e1 ': e2 ef
 
-  Elab e f: これは e f ~> f の型シノニム
+  e ~~> f: これは e f ~> f の型シノニム
             この例だと
-            Elab LogChunk ('[LogChunk] :!! LLog ': ef) は
-            LogChunk ('[LogChunk] :!! LLog ': ef) ~> ('[LogChunk] :!! LLog ': ef)
+            LogChunk ~~> '[LogChunk] :!! Log ': ef
+            LogChunk ('[LogChunk] :!! Log ': ef) ~> ('[LogChunk] :!! Log ': ef)
             と同じ
+
+  infix 2 ~~>
+  -- | Type alias for a natural transformation style elaborator.
+  type e ~~> f = e f ~> f
+
+  v0.3.1ではこう書いていた
+  Elab LogChunk ('[LogChunk] :!! LLog ': ef)
 -}
 elabLimitLogChunk
   :: Log <| ef
   => Int
-  -> Elab LogChunk ('[LogChunk] :!! LLog ': ef)
+  -> LogChunk ~~> '[LogChunk] :!! Log ': ef
 elabLimitLogChunk n (LogChunk name a) =
   logChunk name do
     raise . raiseH $ limitLog $ runLogChunk $ limitLogChunk n a
   where
     limitLog
       :: Log <| ef
-      => '[] :!! LLog ': ef
+      => '[] :!! Log ': ef
       ~> '[] :!! ef
     limitLog a' =
       -- 初期値0でStateエフェクトをハンドル
       evalState @Int 0 $
-        -- エフェクトの干渉を防ぐためinterposeRecではなく、interpretRecを使っている
-        raiseUnder a' & interpretRec \(Logging msg) -> do
+        -- エフェクトの干渉を防ぐためinterposeではなく、interpretRecを使っている
+        raiseUnder a' & interpret \(Logging msg) -> do
           count <- get
           when (count < n) do -- 条件を満たすときだけログ出力
             logging msg

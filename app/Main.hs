@@ -6,7 +6,7 @@ import Effects.DelimitedContinuation as DelimitedContinuation
 
 main :: IO ()
 main = do
-  --Simple.program
+  --Simple.program2
   HigherOrder.program
   HigherOrder.program2
   HigherOrder.program3
