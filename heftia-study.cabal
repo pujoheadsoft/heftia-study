@@ -63,7 +63,8 @@ executable heftia-study
     -- Modules included in this executable, other than Main.
     other-modules: Effects.HigherOrderEffect,
                    Effects.DelimitedContinuation,
-                   Effects.SimpleEffect
+                   Effects.SimpleEffect,
+                   DelimitedContinuation.Example
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
