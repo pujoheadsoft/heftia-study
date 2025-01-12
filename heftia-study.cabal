@@ -61,7 +61,8 @@ executable heftia-study
     main-is:          Main.hs
 
     -- Modules included in this executable, other than Main.
-    other-modules: Effects.HigherOrderEffect,
+    other-modules: Control.Monad.CC,
+                   Effects.HigherOrderEffect,
                    Effects.DelimitedContinuation,
                    Effects.SimpleEffect,
                    DelimitedContinuation.Example
@@ -74,10 +75,11 @@ executable heftia-study
                    heftia-effects ^>= 0.5.0,
                    ghc-typelits-knownnat ^>= 0.7,
                    text,
-                   time
+                   time,
+                   mtl
 
     -- Directories containing source files.
-    hs-source-dirs:   app
+    hs-source-dirs:   app, CC-delcont-0.2.1.0
 
     -- Base language which the package is written in.
     default-language: GHC2021
