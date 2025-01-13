@@ -1,6 +1,7 @@
 module Main (main) where
 
 import DelimitedContinuation.Example as DCE1
+import DelimitedContinuation.Example2 as DCE2
 import DelimitedContinuation.CCDelcont.Example as CCDelcontExample
 import DelimitedContinuation.CCDelcont.TreeIterator as CCDelcontTreeExample
 import DelimitedContinuation.CCDelcont.BreadthFirstTraversal as CCDelcontBreadthFirstTraversal
@@ -17,8 +18,10 @@ main = do
   -- HigherOrder.program2
   -- HigherOrder.program3
   -- DelimitedContinuation.program
-  DCE1.program
-  CCDelcontExample.program
-  CCDelcontTreeExample.program
-  CCDelcontBreadthFirstTraversal.program
-  CCDelcontResumableParsing.program
+  -- DCE1.program
+  -- DCE2.program
+  DCE2.program2
+  -- CCDelcontExample.program
+  -- CCDelcontTreeExample.program
+  -- CCDelcontBreadthFirstTraversal.program
+  -- CCDelcontResumableParsing.program
