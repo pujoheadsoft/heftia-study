@@ -2,7 +2,9 @@ module Main (main) where
 
 import DelimitedContinuation.Example as DCE1
 import DelimitedContinuation.CCDelcont.Example as CCDelcontExample
-import DelimitedContinuation.CCDelcont.TreeExample as CCDelcontTreeExample
+import DelimitedContinuation.CCDelcont.TreeIterator as CCDelcontTreeExample
+import DelimitedContinuation.CCDelcont.BreadthFirstTraversal as CCDelcontBreadthFirstTraversal
+import DelimitedContinuation.CCDelcont.ResumableParsing as CCDelcontResumableParsing
 
 import Effects.SimpleEffect as Simple
 import Effects.HigherOrderEffect as HigherOrder
@@ -18,3 +20,5 @@ main = do
   DCE1.program
   CCDelcontExample.program
   CCDelcontTreeExample.program
+  CCDelcontBreadthFirstTraversal.program
+  CCDelcontResumableParsing.program

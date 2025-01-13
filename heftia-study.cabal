@@ -30,8 +30,10 @@ library
       Control.Monad.CC.Dynvar
       Control.Monad.CC.Prompt
       Control.Monad.CC.Seq
+      DelimitedContinuation.CCDelcont.BreadthFirstTraversal
       DelimitedContinuation.CCDelcont.Example
-      DelimitedContinuation.CCDelcont.TreeExample
+      DelimitedContinuation.CCDelcont.ResumableParsing
+      DelimitedContinuation.CCDelcont.TreeIterator
       DelimitedContinuation.Example
       DelimitedContinuation.Example2
       Effects.DelimitedContinuation

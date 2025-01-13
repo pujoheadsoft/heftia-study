@@ -1,4 +1,5 @@
-module DelimitedContinuation.CCDelcont.TreeExample (program) where
+-- https://wiki.haskell.org/Library/CC-delcont
+module DelimitedContinuation.CCDelcont.TreeIterator (program) where
 
 import Control.Monad.CC (MonadDelimitedCont, reset, runCCT, shift)
 import Control.Monad.IO.Class (liftIO, MonadIO)
@@ -11,7 +12,9 @@ import System.Random.Stateful (Random)
 -- データ型の定義
 
 -- 単純なツリー構造
-data Tree a = Leaf | Branch a (Tree a) (Tree a)
+data Tree a
+  = Branch a (Tree a) (Tree a)
+  | Leaf
   deriving (Show)
 
 instance Foldable Tree where
@@ -31,29 +34,27 @@ insert b (Branch a l r)
   | b < a = Branch a (insert b l) r
   | otherwise = Branch a l (insert b r)
 
-
 -- ------------------------------------------------------------
-
 data Iterator m a
   = Done
-  | Cur a (m (Iterator m a))
+  | Current a (m (Iterator m a))
 
 begin :: (MonadDelimitedCont p s m, Foldable Tree) => Tree a -> m (Iterator m a)
 begin t = reset $ \p ->
   for_
     t
     ( \a ->
-        shift p (\k -> pure (Cur a (k $ pure ())))
+        shift p (\k -> pure (Current a (k $ pure ())))
     )
     >> pure Done
 
 current :: Iterator m a -> Maybe a
 current Done = Nothing
-current (Cur a _) = Just a
+current (Current a _) = Just a
 
 next :: (Monad m) => Iterator m a -> m (Iterator m a)
 next Done = pure Done
-next (Cur _ i) = i
+next (Current _ i) = i
 
 finished :: Iterator m a -> Bool
 finished Done = True
