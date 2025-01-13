@@ -54,6 +54,7 @@ import Control.Monad.CC.Seq
 import Control.Monad.CC.Prompt
 
 -- newtype Frame m ans a b = Frame (a -> CCT ans m b)
+-- 継続のframe
 data Frame m ans a b = FFrame (a -> b)
                      | MFrame (a -> CCT ans m b)
 
@@ -62,17 +63,22 @@ newtype SubCont ans m a b = SC (SubSeq (Frame m) ans a b)
 
 -- | The CCT monad transformer allows you to layer delimited control
 -- effects over an arbitrary monad.
+-- CCT monad transformerを使えば、区切られたコントロール・エフェクトを任意のモナドに重ねることができる。
 --
 -- The CCT transformer is parameterized by the following types
+-- CCT Transformer は、以下のタイプによってパラメータ化される。
 --
 -- * ans : A region parameter, so that prompts and subcontinuations
 --         may only be used in the same region they are created.
+--         prompt や subcontinuationsを、作成された同じリージョンでのみ使用できるようにするためのリージョンパラメータ。
 --
 -- * m   : the underlying monad
+--         基底モナド
 --
 -- * a   : The contained value. A value of type CCT ans m a can be though
 --         of as a computation that calls its continuation with a value of
 --         type 'a'
+--         含まれる値。CCT ans m a型の値は、'a'型の値で継続を呼び出す計算と考えることができる。
 newtype CCT ans m a = CCT { unCCT :: Cont ans m a -> P ans m ans }
 
 instance (Monad m) => Functor (CCT ans m) where
@@ -114,6 +120,7 @@ runCCT :: (Monad m) => (forall ans. CCT ans m a) -> m a
 runCCT c = runP (unCCT c EmptyS)
 
 -- | The CC monad may be used to execute computations with delimited control.
+--   基底モナドをIdentityにしたCCTのラッパー
 newtype CC ans a = CC { unCC :: CCT ans Identity a }
     deriving (Functor, Monad, Applicative, 
                 MonadDelimitedCont (Prompt ans) (SubCont ans Identity))
@@ -144,6 +151,7 @@ class (Monad m) => MonadDelimitedCont p s m | m -> p s where
 
 instance (Monad m) => MonadDelimitedCont (Prompt ans) (SubCont ans m) (CCT ans m) where
     newPrompt = CCT $ \k -> newPromptName >>= appk k
+    pushPrompt :: Monad m => Prompt ans a -> CCT ans m a -> CCT ans m a
     pushPrompt p (CCT e) = CCT $ \k -> e (PushP p k)
     withSubCont p f = CCT $ \k -> let (subk, k') = splitSeq p k
                                    in unCCT (f (SC subk)) k'
