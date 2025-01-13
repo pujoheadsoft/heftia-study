@@ -1,4 +1,4 @@
-module DelimitedContinuation.CCDelcont.Example where
+module DelimitedContinuation.CCDelcont.Example (program) where
 
 import Control.Monad.CC (shift, reset, CC, runCC)
 import Control.Monad (forM_)
