@@ -69,3 +69,7 @@ program2 :: IO ()
 program2 = do
   let tree = Node (Node Empty 1 Empty) 2 (Node Empty 3 Empty)
   printNodes tree
+
+deepTree :: Int -> Tree
+deepTree 0 = Empty
+deepTree n = Node (deepTree (n - 1)) n Empty

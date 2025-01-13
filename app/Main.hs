@@ -19,7 +19,7 @@ main = do
   -- HigherOrder.program3
   -- DelimitedContinuation.program
   -- DCE1.program
-  -- DCE2.program
+  DCE2.program
   DCE2.program2
   -- CCDelcontExample.program
   -- CCDelcontTreeExample.program
