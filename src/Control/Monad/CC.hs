@@ -1,5 +1,6 @@
 {-# LANGUAGE Rank2Types, GeneralizedNewtypeDeriving, MultiParamTypeClasses,
     UndecidableInstances, FunctionalDependencies, FlexibleInstances, GADTs #-}
+{-# LANGUAGE InstanceSigs #-}
 
 --------------------------------------------------------------------------
 -- |

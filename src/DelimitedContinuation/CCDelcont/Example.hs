@@ -35,5 +35,5 @@ test = do i <- iterator $ forM_ [1..5]
                 go l' i'
 
 
-program1 :: IO ()
-program1 = print $ runCC test
+program :: IO ()
+program = print $ runCC test

@@ -2,6 +2,7 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE RankNTypes #-}
 
 module DelimitedContinuation.Example where
 
@@ -39,8 +40,8 @@ pushSubCont = id
 shift :: Prompt ans a -> ((b -> CC ans a) -> CC ans a) -> CC ans b
 shift p f = withSubCont p (\sk -> pushPrompt p (f (pushPrompt p . pushSubCont sk . pure)))
 
-main :: IO ()
-main = do
+program :: IO ()
+program = do
   let computation = do
         p <- newPrompt
         pushPrompt p $ do
