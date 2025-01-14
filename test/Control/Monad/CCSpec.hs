@@ -26,10 +26,12 @@ spec = do
             pure $ 1 + s
       r `shouldBe` 8 -- 2 * 3 + 1 に見えるが、(1 + 3) * 2 になる
 
-    -- it "継続を使って計算することができる" do
-    --   -- let
-    --   --   either :: (MonadDelimitedCont p s m, MonadIO m) => p a -> m a -> m a -> m a
-    --   --   either p a b = shift p \k -> k a >> k b
-    --   r <- reset \p -> do
-    --     liftIO $ print 3
-    --   12 `shouldBe` 12
+    it "継続を使って計算することができる" do
+      let
+        either p a b = shift p \k -> k a >> k b
+        r :: (MonadDelimitedCont p s m, MonadIO m) => m ()
+        r = reset \p -> do
+          x <- either p (pure 1) (pure 2)
+          liftIO $ print x
+          pure ()
+      12 `shouldBe` 12
