@@ -3,6 +3,7 @@ module Control.Monad.CCSpec where
 
 import Test.Hspec
 import Control.Monad.CC
+import Control.Monad.IO.Class (liftIO, MonadIO)
 
 spec :: Spec
 spec = do
@@ -25,3 +26,10 @@ spec = do
             pure $ 1 + s
       r `shouldBe` 8 -- 2 * 3 + 1 に見えるが、(1 + 3) * 2 になる
 
+    -- it "継続を使って計算することができる" do
+    --   -- let
+    --   --   either :: (MonadDelimitedCont p s m, MonadIO m) => p a -> m a -> m a -> m a
+    --   --   either p a b = shift p \k -> k a >> k b
+    --   r <- reset \p -> do
+    --     liftIO $ print 3
+    --   12 `shouldBe` 12
