@@ -109,6 +109,7 @@ test-suite heftia-study-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      Control.Monad.CCSpec
       Paths_heftia_study
   autogen-modules:
       Paths_heftia_study
@@ -133,6 +134,7 @@ test-suite heftia-study-test
     , ghc-typelits-knownnat ==0.7.*
     , heftia-effects >=0.5.0 && <0.6
     , heftia-study
+    , hspec
     , mtl
     , random
     , text

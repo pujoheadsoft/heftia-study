@@ -79,3 +79,4 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - heftia-study
+    - hspec
