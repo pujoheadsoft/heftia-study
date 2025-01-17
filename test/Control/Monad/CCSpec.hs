@@ -47,7 +47,19 @@ spec = do
         これは withSubCont を使用してキャプチャされた部分継続を利用することを可能にします。
       -}
       runCC (reset \p -> (1:) <$> (2:) <$> withSubCont p (\k -> pushSubCont k (return []))) `shouldBe` [1, 2]
-    
+    {-
+
+       【shiftたちの違い】
+       どれもwithSubContにより継続をキャプチャしている。
+       0がつかないものはまずpushPromptで区切っているが、0がついているものは区切っていない。
+
+       shift    p f = withSubCont p $ \sk -> pushPrompt p $ f (\a -> pushPrompt p $ pushSubCont sk a)
+       shift0   p f = withSubCont p $ \sk ->                f (\a -> pushPrompt p $ pushSubCont sk a)
+       control  p f = withSubCont p $ \sk -> pushPrompt p $ f (\a -> pushSubCont sk a)
+       control0 p f = withSubCont p $ \sk ->                f (\a -> pushSubCont sk a)
+       abort    p e = withSubCont p (\_ -> e)
+    -}
+  
   describe "限定継続のテスト" do
     it "継続を使って計算することができる" do
       let r = runCC $ reset $ \p -> do
@@ -55,9 +67,15 @@ spec = do
             pure $ 3 + s - 1 -- 3 + 10 - 1
       r `shouldBe` 12
 
-    it "継続を破棄することができる" do
+    it "継続を破棄することができる(shift版)" do
       let r = runCC $ reset $ \p -> do
             s <- shift p $ \_ -> pure $ 5 * 2
+            pure $ 3 + s - 1 -- 継続部分 3 + [..] - 1は破棄される
+      r `shouldBe` 10
+
+    it "継続を破棄することができる(abort版)" do
+      let r = runCC $ reset $ \p -> do
+            s <- abort p $ pure $ 5 * 2
             pure $ 3 + s - 1 -- 継続部分 3 + [..] - 1は破棄される
       r `shouldBe` 10
 
