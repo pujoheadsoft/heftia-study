@@ -47,7 +47,7 @@ spec = do
         これは withSubCont を使用してキャプチャされた部分継続を利用することを可能にします。
       -}
       runCC (reset \p -> (1:) <$> (2:) <$> withSubCont p (\k -> pushSubCont k (return []))) `shouldBe` [1, 2]
-
+    
   describe "限定継続のテスト" do
     it "継続を使って計算することができる" do
       let r = runCC $ reset $ \p -> do
@@ -104,3 +104,9 @@ spec = do
               pure $ 2 * l
             pure $ 1 + k
       r * 3 `shouldBe` 33
+
+    it "継続を取り出すことができる" do
+      x <- runCCT $ reset \p -> do
+        k <- shift p \k -> k (pure id)
+        pure $ k (* 10)
+      x 3 `shouldBe` 30
