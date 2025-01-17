@@ -108,5 +108,5 @@ spec = do
     it "継続を取り出すことができる" do
       x <- runCCT $ reset \p -> do
         k <- shift p \k -> k (pure id)
-        pure $ k (* 10)
-      x 3 `shouldBe` 30
+        pure $ (+ 3) <$> k <$> (* 10)
+      x 3 `shouldBe` 33
