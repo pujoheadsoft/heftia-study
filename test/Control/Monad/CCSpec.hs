@@ -329,13 +329,13 @@ spec = do
 
       it "shift/shift0/control/control0" do
         let
-          -- 滅茶苦茶見づらいけど全部異なる結果になる
+          -- 一番最初だけ全部異なる関数にした。滅茶苦茶見づらいけど全部異なる結果になる。
           s1 = runCC $ reset (\p -> (1:) <$> pushPrompt p (shift    p (\_ -> shift   p (\k -> (2:) <$> k (pure [])) >>= \y -> shift   p (\_ -> pure y))))
           s2 = runCC $ reset (\p -> (1:) <$> pushPrompt p (shift0   p (\_ -> shift   p (\k -> (2:) <$> k (pure [])) >>= \y -> shift   p (\_ -> pure y))))
           c1 = runCC $ reset (\p -> (1:) <$> pushPrompt p (control  p (\_ -> control p (\k -> (2:) <$> k (pure [])) >>= \y -> control p (\_ -> pure y))))
           c2 = runCC $ reset (\p -> (1:) <$> pushPrompt p (control0 p (\_ -> control p (\k -> (2:) <$> k (pure [])) >>= \y -> control p (\_ -> pure y))))
-
-        s1 `shouldBe` [1, 2]
-        s2 `shouldBe` [2]
-        c1 `shouldBe` [1]
-        c2 `shouldBe` []
+          
+        s1 `shouldBe` [1, 2] -- shiftは外側も内側も破棄されない
+        s2 `shouldBe` [2] -- shift0は外側の継続が破棄されるが、内側は破棄されない
+        c1 `shouldBe` [1] -- controlは外側の継続が破棄されないが、内側は破棄される
+        c2 `shouldBe` []  -- control0は外側も内側も破棄される
