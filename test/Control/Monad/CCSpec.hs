@@ -305,7 +305,7 @@ spec = do
         r1 `shouldBe` 3
         r2 `shouldBe` 3
 
-      it "pushPromptで区切った中でネストした場合、shift0は外側の継続が破棄される" do
+      it "pushPromptで区切った中でネストした場合、control0は外側の継続が破棄される" do
         let
           r1 = runCC $ reset (\p -> (+ 1) <$> pushPrompt p (control  p (\_ -> control  p (\_ -> pure 2))))
           r2 = runCC $ reset (\p -> (+ 1) <$> pushPrompt p (control0 p (\_ -> control0 p (\_ -> pure 2))))
@@ -316,7 +316,7 @@ spec = do
         r3 `shouldBe` 3
 
     describe "shiftとcontrolの違い" do
-      it "" do
+      it "shift/control" do
         let
           -- control p (\f -> e)
           -- とおいたとき /e/を区切りますが、/f/内の部分継続は区切りません。
@@ -326,3 +326,16 @@ spec = do
 
         rs `shouldBe` [1]
         rc `shouldBe` []
+
+      it "shift/shift0/control/control0" do
+        let
+          -- 滅茶苦茶見づらいけど全部異なる結果になる
+          s1 = runCC $ reset (\p -> (1:) <$> pushPrompt p (shift    p (\_ -> shift   p (\k -> (2:) <$> k (pure [])) >>= \y -> shift   p (\_ -> pure y))))
+          s2 = runCC $ reset (\p -> (1:) <$> pushPrompt p (shift0   p (\_ -> shift   p (\k -> (2:) <$> k (pure [])) >>= \y -> shift   p (\_ -> pure y))))
+          c1 = runCC $ reset (\p -> (1:) <$> pushPrompt p (control  p (\_ -> control p (\k -> (2:) <$> k (pure [])) >>= \y -> control p (\_ -> pure y))))
+          c2 = runCC $ reset (\p -> (1:) <$> pushPrompt p (control0 p (\_ -> control p (\k -> (2:) <$> k (pure [])) >>= \y -> control p (\_ -> pure y))))
+
+        s1 `shouldBe` [1, 2]
+        s2 `shouldBe` [2]
+        c1 `shouldBe` [1]
+        c2 `shouldBe` []
