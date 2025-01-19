@@ -321,8 +321,8 @@ spec = do
           -- control p (\f -> e)
           -- とおいたとき /e/を区切りますが、/f/内の部分継続は区切りません。
           -- したがって、/f/の部分継続に他のcontrol呼び出しが含まれている場合、それらの効果が外側の区切りを抜け出す可能性があります。
-          rs = runCC $ reset (\p -> shift   p (\f -> (1:) <$> f (pure [])) >>= \y -> shift   p (\_ -> pure y))
-          rc = runCC $ reset (\p -> control p (\f -> (1:) <$> f (pure [])) >>= \y -> control p (\_ -> pure y))
+          rs = runCC $ reset (\p -> shift   p (\k -> (1:) <$> k (pure [])) >>= \y -> shift   p (\_ -> pure y))
+          rc = runCC $ reset (\p -> control p (\k -> (1:) <$> k (pure [])) >>= \y -> control p (\_ -> pure y))
 
         rs `shouldBe` [1]
         rc `shouldBe` []
