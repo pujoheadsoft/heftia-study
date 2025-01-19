@@ -31,11 +31,8 @@ module Control.Monad.CC.Prompt (
         Equal(..)
     ) where
 
-import Control.Applicative
-
 import Control.Monad.State
 import Control.Monad.Reader
-import Control.Monad.Trans
 
 import Unsafe.Coerce
 
@@ -50,6 +47,7 @@ newtype Prompt ans a = Prompt Int
 
 -- | The prompt generation monad. Represents the type of computations that
 -- make use of a supply of unique prompts.
+-- 状態としてIntを持っており、これがPを識別する値になっている
 newtype P ans m a = P { unP :: StateT Int m a }
     deriving (Functor, Applicative, Monad, MonadTrans, MonadState Int, MonadReader r)
 
@@ -59,8 +57,12 @@ runP :: (Monad m) => P ans m ans -> m ans
 runP p = evalStateT (unP p) 0
 
 -- | Generates a new, unique prompt
+-- P ans m a の a は Prompt ans a である
 newPromptName :: (Monad m) => P ans m (Prompt ans a)
-newPromptName = do i <- get ; put (succ i) ; return (Prompt i)
+newPromptName = do 
+    i <- get     -- 値を取得して
+    put (succ i) -- インクリメントして
+    return (Prompt i) -- インクリメントした値を返す
 
 -- | A datatype representing type equality. The EQU constructor can
 -- be used to provide evidence that two types are equivalent.

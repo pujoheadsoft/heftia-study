@@ -43,12 +43,11 @@ module Control.Monad.CC (
         -- $Examples
     ) where
 
-import Control.Applicative
 
 import Control.Monad.Identity
 import Control.Monad.State
 import Control.Monad.Reader
-import Control.Monad.Trans
+
 import Control.Monad (ap)
 
 import Control.Monad.CC.Seq
@@ -56,10 +55,14 @@ import Control.Monad.CC.Prompt
 
 -- newtype Frame m ans a b = Frame (a -> CCT ans m b)
 -- 継続のframe
-data Frame m ans a b = FFrame (a -> b)
-                     | MFrame (a -> CCT ans m b)
+data Frame m ans a b
+    = FFrame (a -> b)
+    | MFrame (a -> CCT ans m b)
 
+-- 継続
 type Cont ans m a = Seq (Frame m) ans a
+
+-- 部分継続
 newtype SubCont ans m a b = SC (SubSeq (Frame m) ans a b)
 
 -- | The CCT monad transformer allows you to layer delimited control
@@ -112,9 +115,9 @@ appk :: Monad m => Cont ans m a -> a -> P ans m ans
 appk EmptyS        a = return a
 appk (PushP _ k)   a = appk k a
 appk (PushSeg f k) a = appFrame f a k
- where
- appFrame (MFrame g) b l = unCCT (g b) l
- appFrame (FFrame g) b l = appk l (g b)
+    where
+    appFrame (MFrame g) b l = unCCT (g b) l -- g bはCCTを返すので、結果のCCTの中身を取り出してl(継続)に適用
+    appFrame (FFrame g) b l = appk l (g b)
 
 -- | Executes a CCT computation, yielding a value in the underlying monad
 runCCT :: (Monad m) => (forall ans. CCT ans m a) -> m a
@@ -151,11 +154,23 @@ class (Monad m) => MonadDelimitedCont p s m | m -> p s where
     pushSubCont :: s a b -> m a -> m b
 
 instance (Monad m) => MonadDelimitedCont (Prompt ans) (SubCont ans m) (CCT ans m) where
+    newPrompt :: CCT ans m (Prompt ans a)
     newPrompt = CCT $ \k -> newPromptName >>= appk k
-    pushPrompt :: Monad m => Prompt ans a -> CCT ans m a -> CCT ans m a
-    pushPrompt p (CCT e) = CCT $ \k -> e (PushP p k)
-    withSubCont p f = CCT $ \k -> let (subk, k') = splitSeq p k
-                                   in unCCT (f (SC subk)) k'
+    
+    pushPrompt :: Prompt ans a -> CCT ans m a -> CCT ans m a
+    pushPrompt p (CCT e) = CCT $ \k -> e (PushP p k) -- 新しいCCTを生成。このCCTの継続の中で元の継続が使われる。
+
+    withSubCont :: Prompt ans b -> (SubCont ans m a b -> CCT ans m b) -> CCT ans m a
+    withSubCont p f = CCT $ \k -> do -- Cont ans m a が引数で、P ans m ans を返す関数
+        let
+            (subk, k') = splitSeq p k -- サブシーケンスと残りのシーケンスに分割
+                                      -- サブシーケンスは SubSeq (Frame m) ans a bで、残りのシーケンスは Seq (Frame m) ans b
+            sc = SC subk              -- サブシーケンスから部分継続を作る(包むだけ)
+            cct = f sc                -- 部分継続からCCTに変換
+            cnt = unCCT cct           -- (Cont ans m a -> P ans m ans)を取り出す
+        cnt k'
+                                   
+    pushSubCont :: SubCont ans m a b -> CCT ans m a -> CCT ans m b
     pushSubCont (SC subk) (CCT e) = CCT $ \k -> e (pushSeq subk k)
 
 -- | An approximation of the traditional /reset/ operator. Creates a new prompt,
@@ -194,19 +209,23 @@ reset e = newPrompt >>= \p -> pushPrompt p (e p)
 -- | The traditional /shift/ counterpart to the above 'reset'. Reifies the
 -- subcontinuation into a function, keeping both the subcontinuation, and
 -- the resulting computation delimited by the given prompt.
+-- 'reset' に対応する伝統的な /shift/ 演算子です。
+-- 部分継続を関数として具象化し、部分継続と結果の計算の両方を、指定されたプロンプトで区切った状態に保ちます。
 shift :: (MonadDelimitedCont p s m) => p b -> ((m a -> m b) -> m b) -> m a
-shift p f = withSubCont p $ \sk -> pushPrompt p $
-                                f (\a -> pushPrompt p $ pushSubCont sk a)
+shift p f = withSubCont p $ \sk -> pushPrompt p $ f (\a -> pushPrompt p $ pushSubCont sk a)
 
 -- | The /control/ operator, traditionally the counterpart of /prompt/. It does
 -- not delimit the reified subcontinuation, so control effects therein can
 -- escape. The corresponding prompt is performed equally well by 'reset' above.
+-- 具象化された部分継続を区切らないため、その中の制御効果が外部に抜け出すことが可能です。
+-- 対応するプロンプトの機能は、上記の 'reset' によって同様に実現されます。
 control :: (MonadDelimitedCont p s m) => p b -> ((m a -> m b) -> m b) -> m a
-control p f = withSubCont p $ \sk -> pushPrompt p $
-                                f (\a -> pushSubCont sk a)
+control p f = withSubCont p $ \sk -> pushPrompt p $ f (\a -> pushSubCont sk a)
 
 -- | Abortively captures the current subcontinuation, delimiting it in a reified
 -- function. The resulting computation, however, is undelimited.
+-- 現在の部分継続を中断的にキャプチャし、それを具象化された関数内で区切ります。
+-- しかし、結果として得られる計算は区切られていません。
 shift0 :: (MonadDelimitedCont p s m) => p b -> ((m a -> m b) -> m b) -> m a
 shift0 p f = withSubCont p $ \sk -> f (\a -> pushPrompt p $ pushSubCont sk a)
 
