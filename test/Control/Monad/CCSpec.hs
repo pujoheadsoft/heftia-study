@@ -63,21 +63,20 @@ shiftやcontrolといった制御演算子は、この点で類似していま�
 /e/: 中断されたコンテキストで実行される計算
 これらを念頭に置いて、制御演算子の動作を以下に示します：
 
-shift: /e/と/f/の全ての呼び出しを区切ります。そのため、shiftを使用すると、制御効果が区切りを超えて逃げることはありません。次のような計算：
+shift: /e/と/f/の全ての呼び出しを区切ります。そのため、shiftを使用すると、制御効果が区切りを脱出することはありません。
 
+次のような計算：
 > reset (\p -> <computations with shift p>)
 は外部から見ると純粋（pure）に見えます。
 
 control: /e/を区切りますが、/f/内の部分継続は区切りません。
-したがって、/f/の部分継続に他のcontrol呼び出しが含まれている場合、効果が囲まれた区切りを超えて逃げる可能性があります。
+したがって、/f/の部分継続に他のcontrol呼び出しが含まれている場合、その効果は囲まれた区切りを脱出する可能性があります。
 たとえば：
-
-> reset (\p -> shift p (\f -> (1:) `liftM` f (return []))
-           >>= \y -> shift p (\_ -> return y))
+> reset (\p -> shift p (\f -> (1:) `liftM` f (return [])) >>= \y -> shift p (\_ -> return y))
 の結果は[1]ですが、shiftをcontrolに置き換えると結果は[]になります。
 
-shift0: /f/を区切りますが、/e/は区切りません。したがって：
-
+shift0: /f/を区切りますが、/e/は区切りません。
+したがって：
 > reset (\p -> (1:) `liftM` pushPrompt p
                             (shift0 p (\_ -> shift0 p (\_ -> return []))))
 の結果は[]です。
@@ -334,8 +333,32 @@ spec = do
           s2 = runCC $ reset (\p -> (1:) <$> pushPrompt p (shift0   p (\_ -> shift   p (\k -> (2:) <$> k (pure [])) >>= \y -> shift   p (\_ -> pure y))))
           c1 = runCC $ reset (\p -> (1:) <$> pushPrompt p (control  p (\_ -> control p (\k -> (2:) <$> k (pure [])) >>= \y -> control p (\_ -> pure y))))
           c2 = runCC $ reset (\p -> (1:) <$> pushPrompt p (control0 p (\_ -> control p (\k -> (2:) <$> k (pure [])) >>= \y -> control p (\_ -> pure y))))
-          
+
         s1 `shouldBe` [1, 2] -- shiftは外側も内側も破棄されない
         s2 `shouldBe` [2] -- shift0は外側の継続が破棄されるが、内側は破棄されない
         c1 `shouldBe` [1] -- controlは外側の継続が破棄されないが、内側は破棄される
         c2 `shouldBe` []  -- control0は外側も内側も破棄される
+        {-
+          shift p (\f -> e)
+          /p/: プロンプト
+          /f/: 具象化された継続
+          /e/: 中断されたコンテキストで実行される計算
+          として
+          shift:    /e/と/f/の全ての呼び出しを区切ります。
+          shift0:   /f/を区切りますが、/e/は区切りません。
+          control:  /e/を区切りますが、/f/内の部分継続は区切りません。
+          control0: /e/も/f/も区切りません。
+          上記を実装と比べてみよう。
+          shift    p x = withSubCont p $ \sk -> pushPrompt p $ x (\a -> pushPrompt p $ pushSubCont sk a)
+          shift0   p x = withSubCont p $ \sk ->                x (\a -> pushPrompt p $ pushSubCont sk a)
+          control  p x = withSubCont p $ \sk -> pushPrompt p $ x (\a -> pushSubCont sk a)
+          control0 p x = withSubCont p $ \sk ->                x (\a -> pushSubCont sk a)
+
+          基本的には、withSubCont を用いて部分継続をキャプチャすることを可能にしている。
+          x は  ((m a -> m b) -> m b) という型の関数。
+          (m a -> m b) が具象化された継続 f にあたり、m b が中断されたコンテキストで実行される計算 e にあたる。
+
+
+
+          pushSubContでキャプチャされた部分継続を利用することを可能にします。
+        -}
