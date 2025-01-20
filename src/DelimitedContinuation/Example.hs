@@ -37,6 +37,9 @@ withSubCont (Prompt tag) f = CC $ control0# tag $ \k ->
 pushSubCont :: SubCont ans a b -> CC ans a -> CC ans b
 pushSubCont = id
 
+reset :: (Prompt ans b -> CC ans b) -> CC ans b
+reset e = newPrompt >>= \p -> pushPrompt p (e p)
+
 shift :: Prompt ans a -> ((b -> CC ans a) -> CC ans a) -> CC ans b
 shift p f = withSubCont p $ \sk -> pushPrompt p $ f (pushPrompt p . pushSubCont sk . pure)
 
