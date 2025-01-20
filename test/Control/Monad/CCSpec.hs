@@ -354,11 +354,22 @@ spec = do
           control  p x = withSubCont p $ \sk -> pushPrompt p $ x (\a -> pushSubCont sk a)
           control0 p x = withSubCont p $ \sk ->                x (\a -> pushSubCont sk a)
 
-          基本的には、withSubCont を用いて部分継続をキャプチャすることを可能にしている。
-          x は  ((m a -> m b) -> m b) という型の関数。
-          (m a -> m b) が具象化された継続 f にあたり、m b が中断されたコンテキストで実行される計算 e にあたる。
+          基本的には、withSubCont と pushSubCont を用いて部分継続をキャプチャして利用している。これは全部共通。
+          pushPrompt で区切る箇所が異なる。
 
+          まず x は  ((m a -> m b) -> m b) という型の関数。したがって
+          /f/: (m a -> m b) 具象化された継続
+          /e/: m b          中断されたコンテキストで実行される計算
+          である。
+          /f/ に x を適用すると、/e/ が得られる。
+          つまり x (\a -> pushPrompt p $ pushSubCont sk a) などは /e/ にあたり、pushPrompt p $ x /e/ というわけで、
+          これは /e/ を区切る部分である。定義と実装もそうなっている。
+          そして、(\a -> pushPrompt p $ pushSubCont sk a) などは /f/ にあたり、その中で pushPrompt しているのが /f/ を区切る部分である。
+          これも定義と実装がその通りになっている。
 
-
-          pushSubContでキャプチャされた部分継続を利用することを可能にします。
+          上記を踏まえてテストコードを見るとわかりやすいかもしれない
+          reset (\p -> (1:) <$> pushPrompt p (shift    p (\_ -> shift   p (\k -> (2:) <$> k (pure [])) >>= \y -> shift   p (\_ -> pure y))))
+          reset (\p -> (1:) <$> pushPrompt p (shift0   p (\_ -> shift   p (\k -> (2:) <$> k (pure [])) >>= \y -> shift   p (\_ -> pure y))))
+          reset (\p -> (1:) <$> pushPrompt p (control  p (\_ -> control p (\k -> (2:) <$> k (pure [])) >>= \y -> control p (\_ -> pure y))))
+          reset (\p -> (1:) <$> pushPrompt p (control0 p (\_ -> control p (\k -> (2:) <$> k (pure [])) >>= \y -> control p (\_ -> pure y))))
         -}
