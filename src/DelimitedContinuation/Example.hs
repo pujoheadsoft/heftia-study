@@ -38,7 +38,16 @@ pushSubCont :: SubCont ans a b -> CC ans a -> CC ans b
 pushSubCont = id
 
 shift :: Prompt ans a -> ((b -> CC ans a) -> CC ans a) -> CC ans b
-shift p f = withSubCont p (\sk -> pushPrompt p (f (pushPrompt p . pushSubCont sk . pure)))
+shift p f = withSubCont p $ \sk -> pushPrompt p $ f (pushPrompt p . pushSubCont sk . pure)
+
+shift0 :: Prompt ans a -> ((b -> CC ans a) -> CC ans a) -> CC ans b
+shift0 p f = withSubCont p $ \sk -> f (pushPrompt p . pushSubCont sk . pure)
+
+control :: Prompt ans a -> ((b -> CC ans a) -> CC ans a) -> CC ans b
+control p f = withSubCont p $ \sk -> pushPrompt p $ f (pushSubCont sk . pure)
+
+control0 :: Prompt ans a -> ((b -> CC ans a) -> CC ans a) -> CC ans b
+control0 p f = withSubCont p $ \sk -> f (pushSubCont sk . pure)
 
 program :: IO ()
 program = do
