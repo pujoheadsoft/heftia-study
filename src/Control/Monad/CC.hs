@@ -50,8 +50,8 @@ import Control.Monad.Reader
 
 import Control.Monad (ap)
 
-import Control.Monad.CC.Seq
-import Control.Monad.CC.Prompt
+import Control.Monad.CC.Seq ( SubSeq, Seq(..), pushSeq, splitSeq )
+import Control.Monad.CC.Prompt ( P, Prompt, runP, newPromptName )
 
 -- newtype Frame m ans a b = Frame (a -> CCT ans m b)
 -- 継続のframe

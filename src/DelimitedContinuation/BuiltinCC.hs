@@ -17,12 +17,17 @@
 module DelimitedContinuation.BuiltinCC where
 
 import GHC.Exts
-import GHC.IO
+import GHC.IO ( IO(IO) )
+import Control.Monad.IO.Class
+import Control.Monad.Identity (IdentityT)
+import Control.Monad.Trans (lift)
 
 type role CC nominal representational
 
 newtype CC ans a = CC (State# RealWorld -> (# State# RealWorld, a #))
   deriving (Functor, Applicative, Monad) via IO
+
+newtype CCT ans m a = CCT { unCCT :: IdentityT m a }
 
 runCC :: (forall ans. CC ans a) -> a
 runCC (CC m) = case runRW# m of (# _, a #) -> a
