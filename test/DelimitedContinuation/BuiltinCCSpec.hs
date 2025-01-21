@@ -80,32 +80,32 @@ spec = do
     --     either p a b = shift p \k -> k a >> k b
 
     --     -- resetの中ではprintStubは一回の呼び出しに見える
-    --     --r :: (MonadDelimitedCont p s m, MonadIO m) => m ()
-    --   r <- runCC $ reset \p -> do
-    --     x <- either p "a" "b"
-    --     liftIO $ print x
-    --     pure ()
+    --     r :: (MonadDelimitedCont p s m, MonadIO m) => m ()
+    --     r = reset \p -> do
+    --       x <- either p (pure "a") (pure "b")
+    --       liftIO $ printStub x
+    --       pure ()
 
-    --   r `shouldBe` ()
+    --   (runCCT r >>= evaluate) `shouldReturn` ()
 
       -- printStubは2回呼ばれている
       --printMock `shouldApplyInOrder` [ "a", "b" ]
 
-    -- it "継続を使って計算することができる" do
-    --   let r = runCC $ reset $ \p -> do
-    --         k <- shift p $ \k -> do
-    --           l <- shift p $ \l -> k (l 5)
-    --           pure $ 2 * l
-    --         pure $ 1 + k
-    --   r * 3 `shouldBe` 33
+    it "継続を使って計算することができる" do
+      let r = runCC $ reset $ \p -> do
+            k <- shift p $ \k -> do
+              l <- shift p $ \l -> k (l 5)
+              pure $ 2 * l
+            (+ 1) <$> k
+      (r * 3) `shouldBe` 33
 
-  --   -- it "継続を使って計算することができる" do
-  --   --   let r = runCC $ reset $ \p -> pushPrompt p do
-  --   --         k <- shift0 p $ \k -> do
-  --   --           l <- shift0 p $ \l -> k (l (pure 5))
-  --   --           pure $ 2 * l
-  --   --         pure $ 1 + k
-  --   --   r * 3 `shouldBe` 33
+    it "継続を使って計算することができる" do
+      let r = runCC $ reset $ \p -> pushPrompt p do
+            k <- shift0 p $ \k -> do
+              l <- shift0 p $ \l -> k (l 5)
+              pure $ 2 * l
+            (+ 1) <$> k
+      r * 3 `shouldBe` 33
 
     -- it "継続を取り出すことができる" do
     --   x <- runCCT $ reset \p -> do
@@ -166,23 +166,23 @@ spec = do
         r2 `shouldBe` 2
         r3 `shouldBe` 3
 
-  --   describe "shiftとcontrolの違い" do
-  --     it "shift/control" do
-  --       let
-  --         rs = runCC $ reset (\p -> shift   p (\k -> (1:) <$> k (pure [])) >>= \y -> shift   p (\_ -> pure y))
-  --         rc = runCC $ reset (\p -> control p (\k -> (1:) <$> k (pure [])) >>= \y -> control p (\_ -> pure y))
+    describe "shiftとcontrolの違い" do
+      it "shift/control" do
+        let
+          rs = runCC $ reset (\p -> shift   p (\k -> (1:) <$> k []) >>= \y -> shift   p (\_ -> pure y))
+          rc = runCC $ reset (\p -> control p (\k -> (1:) <$> k []) >>= \y -> control p (\_ -> pure y))
 
-  --       rs `shouldBe` [1]
-  --       rc `shouldBe` []
+        rs `shouldBe` [1]
+        rc `shouldBe` []
 
-  --     it "shift/shift0/control/control0" do
-  --       let
-  --         s1 = runCC $ reset (\p -> (1:) <$> pushPrompt p (shift    p (\_ -> shift   p (\k -> (2:) <$> k (pure [])) >>= \y -> shift   p (\_ -> pure y))))
-  --         s2 = runCC $ reset (\p -> (1:) <$> pushPrompt p (shift0   p (\_ -> shift   p (\k -> (2:) <$> k (pure [])) >>= \y -> shift   p (\_ -> pure y))))
-  --         c1 = runCC $ reset (\p -> (1:) <$> pushPrompt p (control  p (\_ -> control p (\k -> (2:) <$> k (pure [])) >>= \y -> control p (\_ -> pure y))))
-  --         c2 = runCC $ reset (\p -> (1:) <$> pushPrompt p (control0 p (\_ -> control p (\k -> (2:) <$> k (pure [])) >>= \y -> control p (\_ -> pure y))))
+      it "shift/shift0/control/control0" do
+        let
+          s1 = runCC $ reset (\p -> (1:) <$> pushPrompt p (shift    p (\_ -> shift   p (\k -> (2:) <$> k []) >>= \y -> shift   p (\_ -> pure y))))
+          s2 = runCC $ reset (\p -> (1:) <$> pushPrompt p (shift0   p (\_ -> shift   p (\k -> (2:) <$> k []) >>= \y -> shift   p (\_ -> pure y))))
+          c1 = runCC $ reset (\p -> (1:) <$> pushPrompt p (control  p (\_ -> control p (\k -> (2:) <$> k []) >>= \y -> control p (\_ -> pure y))))
+          c2 = runCC $ reset (\p -> (1:) <$> pushPrompt p (control0 p (\_ -> control p (\k -> (2:) <$> k []) >>= \y -> control p (\_ -> pure y))))
 
-  --       s1 `shouldBe` [1, 2] -- shiftは外側も内側も破棄されない
-  --       s2 `shouldBe` [2] -- shift0は外側の継続が破棄されるが、内側は破棄されない
-  --       c1 `shouldBe` [1] -- controlは外側の継続が破棄されないが、内側は破棄される
-  --       c2 `shouldBe` []  -- control0は外側も内側も破棄される
+        s1 `shouldBe` [1, 2] -- shiftは外側も内側も破棄されない
+        s2 `shouldBe` [2] -- shift0は外側の継続が破棄されるが、内側は破棄されない
+        c1 `shouldBe` [1] -- controlは外側の継続が破棄されないが、内側は破棄される
+        c2 `shouldBe` []  -- control0は外側も内側も破棄される
