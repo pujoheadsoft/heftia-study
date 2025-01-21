@@ -1,10 +1,20 @@
+{-
+  Haskell 9.6.6からは、限定継続を実現するための機能が提供されるようになった。
+  これはその機能を使って実装したもの。
+
+  ARATA Mizuki(mod_poppo)氏のブログ記事に書かれていたHaskellの実装。
+  https://blog.miz-ar.info/2022/10/delimited-continuations/
+
+  newPrompt, pushPrompt, withSubCont, pushSubContなどの関数を書いてくれていたので、
+  shiftなどは自分で書けた。
+-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE RankNTypes #-}
 
-module DelimitedContinuation.Example where
+module DelimitedContinuation.BuiltinCC where
 
 import GHC.Exts
 import GHC.IO
@@ -52,15 +62,13 @@ control p f = withSubCont p $ \sk -> pushPrompt p $ f (pushSubCont sk . pure)
 control0 :: Prompt ans a -> ((b -> CC ans a) -> CC ans a) -> CC ans b
 control0 p f = withSubCont p $ \sk -> f (pushSubCont sk . pure)
 
+abort :: Prompt ans b -> CC ans b -> CC ans a
+abort p e = withSubCont p (const e)
+
 program :: IO ()
 program = do
-  let computation = do
-        p <- newPrompt
-        pushPrompt p $ do
-          (3 *)
-            <$> shift
-              p
-              ( \k -> do
+  let computation = reset \p -> do
+          (3 *) <$> shift p ( \k -> do
                   x <- k 5
                   y <- k x
                   pure $ 1 + y

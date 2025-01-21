@@ -30,11 +30,11 @@ library
       Control.Monad.CC.Dynvar
       Control.Monad.CC.Prompt
       Control.Monad.CC.Seq
+      DelimitedContinuation.BuiltinCC
       DelimitedContinuation.CCDelcont.BreadthFirstTraversal
       DelimitedContinuation.CCDelcont.Example
       DelimitedContinuation.CCDelcont.ResumableParsing
       DelimitedContinuation.CCDelcont.TreeIterator
-      DelimitedContinuation.Example
       DelimitedContinuation.Example2
       Effects.DelimitedContinuation
       Effects.HigherOrderEffect
@@ -110,6 +110,7 @@ test-suite heftia-study-test
   main-is: Spec.hs
   other-modules:
       Control.Monad.CCSpec
+      DelimitedContinuation.BuiltinCCSpec
       Paths_heftia_study
   autogen-modules:
       Paths_heftia_study
