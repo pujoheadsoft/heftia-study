@@ -69,27 +69,28 @@ spec = do
             pure $ 1 + s
       r `shouldBe` 8 -- 2 * 3 + 1 に見えるが、(1 + 3) * 2 になる
 
-    -- it "継続を複数回使うことができる" do
+    it "継続を複数回使うことができる" do
 
-    --   printMock <- createMock $ any @String |> pure @IO ()
+      printMock <- createMock $ any @String |> pure @IO ()
 
-    --   let
-    --     printStub = stubFn printMock
+      let
+        printStub = stubFn printMock
 
-    --     -- 継続kを2回使う
-    --     either p a b = shift p \k -> k a >> k b
+        -- 継続kを2回使う
+        either p a b = shift p \k -> k a >> k b
 
-    --     -- resetの中ではprintStubは一回の呼び出しに見える
-    --     r :: (MonadDelimitedCont p s m, MonadIO m) => m ()
-    --     r = reset \p -> do
-    --       x <- either p (pure "a") (pure "b")
-    --       liftIO $ printStub x
-    --       pure ()
+      --   -- resetの中ではprintStubは一回の呼び出しに見える
+        --r :: (MonadDelimitedCont p s m, MonadIO m) => m ()
+        r =  reset \p -> do
+          x <- either p "a" "b"
+          liftIO $ print x
+          pure ()
 
-    --   (runCCT r >>= evaluate) `shouldReturn` ()
+      runCC r `shouldBe` ()
+      -- (runCCT r >>= evaluate) `shouldReturn` ()
 
-      -- printStubは2回呼ばれている
-      --printMock `shouldApplyInOrder` [ "a", "b" ]
+      -- -- printStubは2回呼ばれている
+      -- printMock `shouldApplyInOrder` [ "a", "b" ]
 
     it "継続を使って計算することができる" do
       let r = runCC $ reset $ \p -> do

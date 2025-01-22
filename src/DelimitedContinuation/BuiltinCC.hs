@@ -13,24 +13,49 @@
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE RankNTypes #-}
+{-# OPTIONS_GHC -Wno-redundant-constraints #-}
 
 module DelimitedContinuation.BuiltinCC where
 
 import GHC.Exts
 import GHC.IO ( IO(IO) )
 import Control.Monad.IO.Class
-import Control.Monad.Identity (IdentityT)
-import Control.Monad.Trans (lift)
+import Control.Monad.Trans (lift, MonadTrans)
 
 type role CC nominal representational
 
 newtype CC ans a = CC (State# RealWorld -> (# State# RealWorld, a #))
-  deriving (Functor, Applicative, Monad) via IO
+  deriving (Functor, Applicative, Monad, MonadIO) via IO
 
-newtype CCT ans m a = CCT { unCCT :: IdentityT m a }
+newtype CCT ans m a = CCT { unCCT :: m (CC ans a) }
+  deriving (Functor)
+
+instance Monad m => Applicative (CCT ans m) where
+  pure x = CCT $ pure (pure x)
+  (CCT mf) <*> (CCT mx) = CCT $ do
+    f <- mf
+    x <- mx
+    pure (f <*> x)
+
+instance Monad m => Monad (CCT ans m) where
+  return = pure
+  (CCT mx) >>= k = CCT $ do
+    x <- mx
+    pure $ x >>= \a -> let CCT my = k a in unsafeCoerce# my
+
+instance MonadTrans (CCT ans) where
+  lift :: Monad m => m a -> CCT ans m a
+  lift ma = CCT $ pure <$> ma
+
+instance MonadIO m => MonadIO (CCT ans m) where
+  liftIO :: IO a -> CCT ans m a
+  liftIO io = lift (liftIO io)
 
 runCC :: (forall ans. CC ans a) -> a
 runCC (CC m) = case runRW# m of (# _, a #) -> a
+
+runCCT :: Monad m => CCT ans m a -> m (CC ans a)
+runCCT = unCCT
 
 type role Prompt nominal representational
 
