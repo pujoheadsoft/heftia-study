@@ -1,4 +1,4 @@
-module Effects.DelimitedContinuation where
+module Effects.ResetFork where
 
 import Control.Monad.Hefty
 {-

@@ -36,11 +36,11 @@ library
       DelimitedContinuation.CCDelcont.ResumableParsing
       DelimitedContinuation.CCDelcont.TreeIterator
       DelimitedContinuation.Example2
-      Effects.DelimitedContinuation
       Effects.HigherOrderEffect
+      Effects.ResetFork
       Effects.SimpleEffect
-      Effects.V0_3.DelimitedContinuation
       Effects.V0_3.HigherOrderEffect
+      Effects.V0_3.ResetFork
       Effects.V0_3.SimpleEffect
   other-modules:
       Paths_heftia_study

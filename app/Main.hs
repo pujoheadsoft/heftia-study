@@ -9,7 +9,7 @@ import DelimitedContinuation.CCDelcont.ResumableParsing as CCDelcontResumablePar
 
 import Effects.SimpleEffect as Simple
 import Effects.HigherOrderEffect as HigherOrder
-import Effects.DelimitedContinuation as DelimitedContinuation
+import Effects.ResetFork as ResetFork
 
 main :: IO ()
 main = do
@@ -17,7 +17,7 @@ main = do
   -- HigherOrder.program
   -- HigherOrder.program2
   -- HigherOrder.program3
-  -- DelimitedContinuation.program
+  -- ResetFork.program
   DCE1.program
   -- DCE2.program
   -- DCE2.program2

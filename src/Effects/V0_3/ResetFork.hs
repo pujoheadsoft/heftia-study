@@ -1,4 +1,4 @@
-module Effects.V0_3.DelimitedContinuation where
+module Effects.V0_3.ResetFork where
 
 -- import Control.Monad.Hefty
 -- import Data.Effect.TH (makeEffectF, makeEffectH)
