@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 module DelimitedContinuation.CCDelcont.Example (program) where
 
 import Control.Monad.CC (shift, reset, CC, runCC)
@@ -19,19 +20,19 @@ current (Current a _) = Just a
 
 next :: Iterator r a -> CC r (Iterator r a)
 next (Current _ m) = m
-next Done    = return Done
+next Done    = pure Done
 
 iterator :: ((a -> CC r ()) -> CC r ()) -> CC r (Iterator r a)
 iterator loop = reset $ \p ->
                  loop (\a ->
                     shift p $ \k ->
-                        pure $ Current a (k $ return ())) >> return Done
+                        pure $ Current a (k $ pure ())) >> pure Done
 
 test :: CC r [Int]
 test = do i <- iterator $ forM_ [1..5]
           go [] i
  where
- go l Done = return l
+ go l Done = pure l
  go l i    = do let (Just a) = current i
                     l' = replicate a a ++ l
                 i' <- next i

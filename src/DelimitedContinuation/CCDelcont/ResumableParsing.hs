@@ -1,7 +1,7 @@
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 module DelimitedContinuation.CCDelcont.ResumableParsing (program) where
 
 import Control.Monad.CC (MonadDelimitedCont, shift, reset, runCC)
-import Control.Monad (liftM)
 
 {-
 次の例は、OCamlメーリングリストへの投稿のHaskellバージョンに関するものだ。
@@ -38,13 +38,13 @@ finish (ReqChar k) = k Nothing
 これがまさに区切り文字による継続処理である。 パーサーを制御するために使うフックは、入力として受け取る文字ストリームである：
 -}
 toList :: Monad m => m (Maybe a) -> m [a]
-toList gen = gen >>= maybe (return []) (\c -> liftM (c:) $ toList gen)
+toList gen = gen >>= maybe (return []) (\c -> (c:) <$> toList gen)
 
 streamInvert :: MonadDelimitedCont p s m => p (Request m a) -> m (Maybe Char)
 streamInvert p = shift p (\k -> return $ ReqChar (k . return))
 
 invertParse :: MonadDelimitedCont p s m => (String -> a) -> m (Request m a)
-invertParse parser = reset $ \p -> (Done . parser) `liftM` toList (streamInvert p)
+invertParse parser = reset $ \p -> Done . parser <$> toList (streamInvert p)
 
 {-
 つまり、'toList'は単に、文字を生成する可能性のあるモナディック・アクショ ンを受け取り、それを使って文字のリストを生成する（'Nothing'を見つけたら停止する）。
