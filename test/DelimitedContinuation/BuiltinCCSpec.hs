@@ -1,11 +1,12 @@
 {-# OPTIONS_GHC -Wno-type-defaults #-}
 {-# LANGUAGE TypeApplications #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Redundant <$>" #-}
 module DelimitedContinuation.BuiltinCCSpec where
 
 import Prelude hiding (either, any)
 import Test.Hspec
 import DelimitedContinuation.BuiltinCC
-import GHC.IO (evaluate)
 import Test.MockCat
 import Control.Monad.IO.Class (liftIO)
 
@@ -23,13 +24,6 @@ spec = do
 
     it "pushSubCont" do
       runCC (reset \p -> (1:) <$> (2:) <$> withSubCont p (\k -> pushSubCont k (return []))) `shouldBe` [1, 2]
-
-    -- it "pushPromptせずにwithSubContを使うとエラーになる" do
-    --   let
-    --     r = runCC $ newPrompt >>= \p -> withSubCont p \_ -> pure 3
-    --     -- こうすればいける(これはreset \p -> abort p xxと同じ)
-    --     -- r = runCC $ newPrompt >>= \p -> pushPrompt p $ withSubCont p \_ -> pure 3
-    --   r `shouldThrow` errorCall "no matching prompt in the current continuation"
 
   describe "限定継続のテスト" do
     it "継続を使って計算することができる" do
@@ -74,23 +68,22 @@ spec = do
       printMock <- createMock $ any @String |> pure @IO ()
 
       let
+        printStub :: String -> IO ()
         printStub = stubFn printMock
 
         -- 継続kを2回使う
         either p a b = shift p \k -> k a >> k b
 
-      --   -- resetの中ではprintStubは一回の呼び出しに見える
-        --r :: (MonadDelimitedCont p s m, MonadIO m) => m ()
+        -- resetの中ではprintStubは一回の呼び出しに見える
         r =  reset \p -> do
           x <- either p "a" "b"
-          liftIO $ print x
+          liftIO $ printStub x
           pure ()
 
       runCC r `shouldBe` ()
-      -- (runCCT r >>= evaluate) `shouldReturn` ()
 
       -- -- printStubは2回呼ばれている
-      -- printMock `shouldApplyInOrder` [ "a", "b" ]
+      printMock `shouldApplyInOrder` [ "a", "b" ]
 
     it "継続を使って計算することができる" do
       let r = runCC $ reset $ \p -> do
