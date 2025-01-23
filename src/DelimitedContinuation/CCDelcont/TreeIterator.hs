@@ -1,4 +1,8 @@
 -- https://wiki.haskell.org/Library/CC-delcont
+{-# OPTIONS_GHC -Wno-type-defaults #-}
+{-# OPTIONS_GHC -Wno-unused-matches #-}
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
+{-# OPTIONS_GHC -Wno-unused-top-binds #-}
 module DelimitedContinuation.CCDelcont.TreeIterator (program) where
 
 import Control.Monad.CC (MonadDelimitedCont, reset, runCCT, shift)
