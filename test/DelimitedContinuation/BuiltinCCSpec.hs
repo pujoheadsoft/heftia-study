@@ -12,7 +12,7 @@ import Control.Monad.IO.Class (liftIO)
 
 spec :: Spec
 spec = do
-  describe "" do
+  describe "基本的なオペレーターのテスト" do
     it "pushPrompt" do
       runCC (newPrompt >>= \p -> pushPrompt p (pure "x")) `shouldBe` "x"
 
@@ -101,11 +101,12 @@ spec = do
             (+ 1) <$> k
       r * 3 `shouldBe` 33
 
-    -- it "継続を取り出すことができる" do
-    --   x <- runCCT $ reset \p -> do
-    --     k <- shift p \k -> k (pure id)
-    --     pure $ (+ 3) <$> k <$> (* 10)
-    --   x 3 `shouldBe` 33
+    it "継続を取り出すことができる" do
+      let 
+        r = runCC $ reset \p -> do
+          k <- shift p \k -> k id
+          pure $ (+ 3) <$> k <$> (* 10)
+      r 3 `shouldBe` 33
 
     describe "shiftとshift0の違い" do
       it "pushPromptで区切らない場合同じ結果になる" do
