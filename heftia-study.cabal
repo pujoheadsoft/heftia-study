@@ -38,6 +38,7 @@ library
       DelimitedContinuation.Example2
       Effects.HigherOrderEffect
       Effects.ResetFork
+      Effects.ResetShift
       Effects.SimpleEffect
       Effects.V0_3.HigherOrderEffect
       Effects.V0_3.ResetFork
@@ -111,6 +112,7 @@ test-suite heftia-study-test
   other-modules:
       Control.Monad.CCSpec
       DelimitedContinuation.BuiltinCCSpec
+      Effects.ShiftResetSpec
       Paths_heftia_study
   autogen-modules:
       Paths_heftia_study
