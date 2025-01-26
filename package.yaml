@@ -27,6 +27,7 @@ dependencies:
 - text
 - time
 - random
+- extra
 
 ghc-options:
 - -Wall

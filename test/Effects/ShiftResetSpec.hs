@@ -5,27 +5,69 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
 module Effects.ShiftResetSpec where
 
 import Prelude hiding (either, any)
 import Test.Hspec
 
-import Data.Effect.ShiftReset
+import Data.Effect.ShiftReset ( reset, shiftF, shift, Reset, ShiftF, Shift_, embedF, ShiftKey, Shift' )
 import Control.Monad.Hefty
 
-import Control.Monad.Hefty.ShiftReset
+import Control.Monad.Hefty.ShiftReset ( runReset, runShiftF, Shift, exitF, evalShift )
 import Control.Category 
+import Effects.HigherOrderEffect (Log, logging)
+import Data.Text (pack)
+import Control.Effect.Key (SendHOEBy)
 
 {-
+data Reset m (a :: Type) where
+    Reset :: m a -> Reset m a
+makeEffectH [''Reset]
+
 data Shift' (ans :: Type) n m a where
     Shift
         :: forall ans n m a
          . ((a -> n ans) -> (forall x. m x -> n x) -> n ans)
         -> Shift' ans n m a
 makeKeyedEffect [] [''Shift']
+
+data ShiftF ans a where
+    ShiftF :: forall ans a. ((a -> ans) -> ans) -> ShiftF ans a
+
+ShiftF (Eff '[] '[IO] String) だとしたら
+ansが (Eff '[] '[IO] String) だから
+
+shiftF :: ((a -> (Eff '[] '[IO] String)) -> (Eff '[] '[IO] String)) -> ShiftF (Eff '[] '[IO] String) a
+となるわけか。
+したがって shiftF k の k は (a -> (Eff '[] '[IO] String)) という型だな。
+
+Eff は Eff eh ef a という定義だ。つまり高階はなく、一階のエフェクトとしてIOがあるということだ。扱うのはString。
+
 -}
 
+-- r :: (Reset <<: m, Shift_ (Eff '[Reset] '[] String) <: m, Monad m) => m String
+-- r = reset $ shiftF \k -> k $ pure "x"
+{-
+  ShiftFの型はShiftF answertype a で
+  runShiftFはこういう定義になっている。
+  runShiftF :: Eff '[] (ShiftF (Eff '[] ef ans) ': ef) ans -> Eff '[] ef ans
+  したがってShiftFはShiftF (Eff '[] ef ans) ': efという型でないといけない。
+  今回efはなくていいから ShiftF (Eff '[] '[] String) という型になる。
+  そして、ShiftFの定義に上を当てはめると
+  data ShiftF ans a where
+      ShiftF :: forall ans a. ((a -> ans) -> ans) -> ShiftF ans a
+  が
+  data ShiftF (Eff '[] '[] String) a where
+    ShiftF :: ((a -> (Eff '[] '[] String)) -> Eff '[] '[] String) -> ShiftF (Eff '[] '[] String) a
 
+
+-}
+-- xx :: (Reset <<: m, ShiftF (Eff '[] '[] String) <: m, Monad m) => m String
+xx :: (Reset <<: m, SendHOEBy ShiftKey (Shift' String n) m, Monad m) => m String
+xx = reset do
+  x <- shift \k _ -> k "x"
+  pure x
 
 spec :: Spec
 spec = do
@@ -37,20 +79,20 @@ spec = do
       x <- (runEff <<< runReset) r
       x `shouldBe` "x"
 
-    -- it "reset" do
-    --   let 
-    --     r :: (Reset <<: m, ShiftF String <: m, Monad m) => m String
-    --     r = reset do
-    --       x <- shiftF \_ -> "x"
-    --       pure x
-    --   -- evalShift :: Eff '[Shift ans '[] ef] ef ans -> Eff '[] ef ans
-    --   -- runShift  :: (a -> Eff '[] ef ans) -> Eff '[Shift ans '[] ef] ef a -> Eff '[] ef ans
-    --   -- runShift_ :: Eff (Shift_ (Eff eh ef) ': eh) ef ~> Eff eh ef
-    --   -- runShiftF :: Eff '[] (ShiftF (Eff '[] ef ans) ': ef) ans -> Eff '[] ef ans
-    --   -- runReset  :: Eff (Reset ': eh) ef ~> Eff eh ef
-    --   -- runEff    :: Monad m => Eff '[] '[m] ~> m
-    --   x <- (runEff <<< runShiftF <<< runReset) r
-    --   x `shouldBe` "x"
+    it "reset" do
+      let 
+        r :: (Reset <<: m, ShiftF (Eff '[] '[IO] String) <: m, Monad m) => m String
+        r = reset do
+          --x <- shiftF \k -> k $ pure "x"
+          pure ""
+      -- evalShift :: Eff '[Shift ans '[] ef] ef ans -> Eff '[] ef ans
+      -- runShift  :: (a -> Eff '[] ef ans) -> Eff '[Shift ans '[] ef] ef a -> Eff '[] ef ans
+      -- runShift_ :: Eff (Shift_ (Eff eh ef) ': eh) ef ~> Eff eh ef
+      -- runShiftF :: Eff '[] (ShiftF (Eff '[] ef ans) ': ef) ans -> Eff '[] ef ans
+      -- runReset  :: Eff (Reset ': eh) ef ~> Eff eh ef
+      -- runEff    :: Monad m => Eff '[] '[m] ~> m
+      x <- (runEff <<< evalShift <<< runReset) xx
+      x `shouldBe` "x"
 
   --describe "基本的なオペレーターのテスト" do
     -- it "pushPrompt" do

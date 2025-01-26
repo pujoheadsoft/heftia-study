@@ -18,6 +18,7 @@ data Log a where
 
 makeEffectF [''Log]
 
+-- Logのハンドラ
 logToIO :: (IO <| r) => eh :!! Log ': r ~> eh :!! r
 logToIO = interpret \(Logging msg) -> liftIO $ T.putStrLn msg
 
@@ -28,13 +29,14 @@ data Time a where
 
 makeEffectF [''Time]
 
+-- Timeのハンドラ
 timeToIO :: (IO <| r) => eh :!! Time ': r ~> eh :!! r
 timeToIO = interpret \CurrentTime -> liftIO getCurrentTime
 
 ---------------------------------------------------------
-
+-- LogとTimeのハンドラ
 logWithTime :: (Log <| ef, Time <| ef) => eh :!! ef ~> eh :!! ef
-logWithTime = interpose \(Logging msg) -> do
+logWithTime = interpose \(Logging msg) -> do -- interposeで再解釈
   t <- currentTime
   logging $ pack "[" <> iso8601 t <> pack "] " <> msg
 
@@ -55,9 +57,11 @@ data LogChunk f (a :: Type) where
 
 makeEffectH [''LogChunk]
 
+-- LogChunkのElaborator
 runLogChunk :: LogChunk ': eh :!! ef ~> eh :!! ef
 runLogChunk = interpretH \(LogChunk _ m) -> m
 
+-- 高階なエフェクトフルプログラム
 logExample :: (LogChunk <<: m, Log <: m, MonadIO m) => m ()
 logExample = do
   logging $ pack "out of chunk scope1 1"
@@ -134,7 +138,7 @@ saveLogChunk =
   !! や + は :!! が型レベルリストを使うのに対する代替の記法
   eh や ef や r といった多相化されたリストの型変数が出現しない場合こう書ける
 -}
-runApp :: LogChunk !! FileSystem + Time + Log + IO ~> IO
+runApp :: LogChunk !! (FileSystem + Time + Log + IO) ~> IO
 runApp =
   runLogChunk
     >>> runDymmyFS
