@@ -67,7 +67,7 @@ Eff は Eff eh ef a という定義だ。つまり高階はなく、一階のエ
 xx :: (Reset <<: m, SendHOEBy ShiftKey (Shift' String n) m, Monad m) => m String
 xx = reset do
   x <- shift \k _ -> k "x"
-  pure x
+  pure $ x <> "y"
 
 spec :: Spec
 spec = do
@@ -92,7 +92,7 @@ spec = do
       -- runReset  :: Eff (Reset ': eh) ef ~> Eff eh ef
       -- runEff    :: Monad m => Eff '[] '[m] ~> m
       x <- (runEff <<< evalShift <<< runReset) xx
-      x `shouldBe` "x"
+      x `shouldBe` "xy"
 
   --describe "基本的なオペレーターのテスト" do
     -- it "pushPrompt" do
