@@ -19,6 +19,8 @@ import Control.Category
 import Effects.HigherOrderEffect (Log, logging)
 import Data.Text (pack)
 import Control.Effect.Key (SendHOEBy)
+import Control.Monad.Trans
+import Test.MockCat
 
 {-
   data Reset m (a :: Type) where
@@ -83,121 +85,26 @@ spec = do
       r <- (runEff <<< evalShift <<< runReset) program
       r `shouldBe` 8 -- 2 * 3 + 1 に見えるが、(1 + 3) * 2 になる
 
-  --   it "継続を複数回使うことができる" do
+    it "継続を複数回使うことができる" do
 
-  --     printMock <- createMock $ any @String |> pure @IO ()
+      printMock <- createMock $ any @String |> pure @IO ()
 
-  --     let
-  --       printStub :: String -> IO ()
-  --       printStub = stubFn printMock
+      let
+        printStub :: String -> IO ()
+        printStub = stubFn printMock
 
-  --       -- 継続kを2回使う
-  --       either p a b = shift p \k -> k a >> k b
+        -- 継続kを2回使う
+        either a b = shift \k _ -> k a >> k b
 
-  --       -- resetの中ではprintStubは一回の呼び出しに見える
-  --       r =  reset \p -> do
-  --         x <- either p "a" "b"
-  --         liftIO $ printStub x
-  --         pure ()
+        -- resetの中ではprintStubは一回の呼び出しに見える
+        program = reset do
+          x <- either "a" "b"
+          liftIO $ printStub x
+          pure ()
 
-  --     runCC r `shouldBe` ()
+      r <- (runEff <<< evalShift <<< runReset) program
+      r `shouldBe` ()
 
-  --     -- -- printStubは2回呼ばれている
-  --     printMock `shouldApplyInOrder` [ "a", "b" ]
+      -- -- printStubは2回呼ばれている
+      printMock `shouldApplyInOrder` [ "a", "b" ]
 
-  --   it "継続を使って計算することができる" do
-  --     let r = runCC $ reset $ \p -> do
-  --           k <- shift p $ \k -> do
-  --             l <- shift p $ \l -> k (l 5)
-  --             pure $ 2 * l
-  --           (+ 1) <$> k
-  --     (r * 3) `shouldBe` 33
-
-  --   it "継続を使って計算することができる" do
-  --     let r = runCC $ reset $ \p -> pushPrompt p do
-  --           k <- shift0 p $ \k -> do
-  --             l <- shift0 p $ \l -> k (l 5)
-  --             pure $ 2 * l
-  --           (+ 1) <$> k
-  --     r * 3 `shouldBe` 33
-
-  --   it "継続を取り出すことができる" do
-  --     let 
-  --       r = runCC $ reset \p -> do
-  --         k <- shift p \k -> k id
-  --         pure $ (+ 3) <$> k <$> (* 10)
-  --     r 3 `shouldBe` 33
-
-  --   describe "shiftとshift0の違い" do
-  --     it "pushPromptで区切らない場合同じ結果になる" do
-  --       let
-  --         r1 = runCC $ reset (\p -> (+ 1) <$> shift  p (\_ -> pure 2))
-  --         r2 = runCC $ reset (\p -> (+ 1) <$> shift0 p (\_ -> pure 2))
-
-  --       r1 `shouldBe` 2
-  --       r2 `shouldBe` 2
-
-  --     it "pushPromptで区切った場合も同じ結果になる" do
-  --       let
-  --         r1 = runCC $ reset (\p -> (+ 1) <$> pushPrompt p (shift  p (\_ -> pure 2)))
-  --         r2 = runCC $ reset (\p -> (+ 1) <$> pushPrompt p (shift0 p (\_ -> pure 2)))
-
-  --       r1 `shouldBe` 3
-  --       r2 `shouldBe` 3
-
-  --     it "pushPromptで区切った中でネストした場合、shift0は外側の継続が破棄される" do
-  --       let
-  --         r1 = runCC $ reset (\p -> (+ 1) <$> pushPrompt p (shift  p (\_ -> shift  p (\_ -> pure 2))))
-  --         r2 = runCC $ reset (\p -> (+ 1) <$> pushPrompt p (shift0 p (\_ -> shift0 p (\_ -> pure 2))))
-  --         -- ↑ r2は継続 [..] + 1 が破棄される。↓のようにネストした中でpushPromptすればshift0でも外側の継続が破棄さない
-  --         r3 = runCC $ reset (\p -> (+ 1) <$> pushPrompt p (shift0 p (\_ -> pushPrompt p $ shift0 p (\_ -> pure 2))))
-  --       r1 `shouldBe` 3
-  --       r2 `shouldBe` 2
-  --       r3 `shouldBe` 3
-
-  --   describe "controlとcontrol0の違い" do
-  --     it "pushPromptで区切らない場合同じ結果になる" do
-  --       let
-  --         r1 = runCC $ reset (\p -> (+ 1) <$> control  p (\_ -> pure 2))
-  --         r2 = runCC $ reset (\p -> (+ 1) <$> control0 p (\_ -> pure 2))
-
-  --       r1 `shouldBe` 2
-  --       r2 `shouldBe` 2
-
-  --     it "pushPromptで区切った場合も同じ結果になる" do
-  --       let
-  --         r1 = runCC $ reset (\p -> (+ 1) <$> pushPrompt p (control  p (\_ -> pure 2)))
-  --         r2 = runCC $ reset (\p -> (+ 1) <$> pushPrompt p (control0 p (\_ -> pure 2)))
-
-  --       r1 `shouldBe` 3
-  --       r2 `shouldBe` 3
-
-  --     it "pushPromptで区切った中でネストした場合、control0は外側の継続が破棄される" do
-  --       let
-  --         r1 = runCC $ reset (\p -> (+ 1) <$> pushPrompt p (control  p (\_ -> control  p (\_ -> pure 2))))
-  --         r2 = runCC $ reset (\p -> (+ 1) <$> pushPrompt p (control0 p (\_ -> control0 p (\_ -> pure 2))))
-  --         r3 = runCC $ reset (\p -> (+ 1) <$> pushPrompt p (control0 p (\_ -> pushPrompt p $ control0 p (\_ -> pure 2))))
-  --       r1 `shouldBe` 3
-  --       r2 `shouldBe` 2
-  --       r3 `shouldBe` 3
-
-  --   describe "shiftとcontrolの違い" do
-  --     it "shift/control" do
-  --       let
-  --         rs = runCC $ reset (\p -> shift   p (\k -> (1:) <$> k []) >>= \y -> shift   p (\_ -> pure y))
-  --         rc = runCC $ reset (\p -> control p (\k -> (1:) <$> k []) >>= \y -> control p (\_ -> pure y))
-
-  --       rs `shouldBe` [1]
-  --       rc `shouldBe` []
-
-  --     it "shift/shift0/control/control0" do
-  --       let
-  --         s1 = runCC $ reset (\p -> (1:) <$> pushPrompt p (shift    p (\_ -> shift   p (\k -> (2:) <$> k []) >>= \y -> shift   p (\_ -> pure y))))
-  --         s2 = runCC $ reset (\p -> (1:) <$> pushPrompt p (shift0   p (\_ -> shift   p (\k -> (2:) <$> k []) >>= \y -> shift   p (\_ -> pure y))))
-  --         c1 = runCC $ reset (\p -> (1:) <$> pushPrompt p (control  p (\_ -> control p (\k -> (2:) <$> k []) >>= \y -> control p (\_ -> pure y))))
-  --         c2 = runCC $ reset (\p -> (1:) <$> pushPrompt p (control0 p (\_ -> control p (\k -> (2:) <$> k []) >>= \y -> control p (\_ -> pure y))))
-
-  --       s1 `shouldBe` [1, 2] -- shiftは外側も内側も破棄されない
-  --       s2 `shouldBe` [2] -- shift0は外側の継続が破棄されるが、内側は破棄されない
-  --       c1 `shouldBe` [1] -- controlは外側の継続が破棄されないが、内側は破棄される
-  --       c2 `shouldBe` []  -- control0は外側も内側も破棄される
