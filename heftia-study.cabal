@@ -114,6 +114,7 @@ test-suite heftia-study-test
   other-modules:
       Control.Monad.CCSpec
       DelimitedContinuation.BuiltinCCSpec
+      Effects.HigherOrderEffectSpec
       Effects.ShiftResetSpec
       Effects.SimpleEffectSpec
       Paths_heftia_study
