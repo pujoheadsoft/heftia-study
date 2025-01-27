@@ -11,15 +11,12 @@ module Effects.ShiftResetSpec where
 import Prelude hiding (either, any)
 import Test.Hspec
 
-import Data.Effect.ShiftReset ( reset, shiftF, shift, Reset, ShiftF, Shift_, embedF, ShiftKey, Shift', exit )
+import Data.Effect.ShiftReset ( reset, shift, Reset, ShiftKey, Shift', exit )
 import Control.Monad.Hefty
 
-import Control.Monad.Hefty.ShiftReset ( runReset, runShiftF, Shift, exitF, evalShift )
+import Control.Monad.Hefty.ShiftReset ( runReset, evalShift )
 import Control.Category 
-import Effects.HigherOrderEffect (Log, logging)
-import Data.Text (pack)
 import Control.Effect.Key (SendHOEBy)
-import Control.Monad.Trans
 import Test.MockCat
 
 {-
