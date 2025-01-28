@@ -9,10 +9,10 @@ data X a where
 makeEffectF [''X]
 
 data Y a where
-  Y :: Y Int
+  Y :: Y String
 
 makeEffectF [''Y]
 
 t :: eh :!! X ': ef ~> eh :!! Y ': ef
 t = transform \case
-  X -> undefined
+  X -> Y
