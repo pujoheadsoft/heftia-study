@@ -67,13 +67,9 @@ logExample = do
   logging $ pack "out of chunk scope1 1"
   logging $ pack "out of chunk scope1 2"
 
-  liftIO $ putStrLn "-------"
-
   logChunk (pack "scope2") do
     logging $ pack "in scope2 1"
     logging $ pack "in scope2 2"
-
-  liftIO $ putStrLn "-------"
 
   logging $ pack "out of chunk scope1 3"
   logging $ pack "out of chunk scope1 4"
