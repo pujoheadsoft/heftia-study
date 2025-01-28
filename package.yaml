@@ -23,10 +23,8 @@ dependencies:
 - base >= 4.7 && < 5
 - heftia-effects ^>= 0.5.0
 - ghc-typelits-knownnat ^>= 0.7
-- mtl
 - text
 - time
-- random
 - extra
 
 ghc-options:
