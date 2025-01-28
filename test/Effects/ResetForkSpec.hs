@@ -10,7 +10,6 @@ import Effects.ResetFork
 import Data.Text (Text, pack)
 import Data.Time
 import System.IO.Unsafe
-import Control.Category ((>>>))
 import Effects.HigherOrderEffect (logging, Log (..))
 
 toUTCTime :: String -> UTCTime
