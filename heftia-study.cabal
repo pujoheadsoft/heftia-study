@@ -115,6 +115,7 @@ test-suite heftia-study-test
       Control.Monad.CCSpec
       DelimitedContinuation.BuiltinCCSpec
       Effects.HigherOrderEffectSpec
+      Effects.ResetForkSpec
       Effects.ShiftResetSpec
       Effects.SimpleEffectSpec
       Paths_heftia_study
