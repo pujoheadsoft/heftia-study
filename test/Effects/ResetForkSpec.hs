@@ -20,8 +20,7 @@ toUTCTime timeStr = unsafePerformIO $ do
 spec :: Spec
 spec = do
   describe "高階のエフェクトフルプログラム(Reset/Fork)" do
-    it "" do
-
+    it "Reset/Forkによる限定継続" do
       logMock <- createMock $ any @Text |> pure @IO ()
            
       r <- runEff
