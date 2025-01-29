@@ -61,6 +61,12 @@ strong = interpose \case
     ReadTTY -> readTTY
     WriteTTY msg -> writeTTY $ msg <> "!"
 
+-- rewriteで書いた版
+strongR :: (Teletype <| ef) => eh :!! ef ~> eh :!! ef
+strongR = rewrite \case
+    ReadTTY -> ReadTTY
+    WriteTTY msg -> WriteTTY $ msg <> "!"
+
 echo :: (Teletype <: m, Monad m) => m ()
 echo = do
   i <- readTTY
