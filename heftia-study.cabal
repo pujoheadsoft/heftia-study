@@ -98,6 +98,7 @@ test-suite heftia-study-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      Effects.ExperimentSpec
       Effects.HigherOrderEffectSpec
       Effects.ResetForkSpec
       Effects.ShiftResetSpec

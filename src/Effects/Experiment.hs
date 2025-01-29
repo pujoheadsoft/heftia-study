@@ -34,4 +34,4 @@ translateXtoY = translate hoge
 -- rewrite :: forall e ef eh. (e <| ef) => (e ~> e) -> Eff eh ef ~> Eff eh ef
 rewriteX :: eh :!! X ': ef ~> eh :!! X ': ef
 rewriteX = rewrite \case
-  X a b -> X a b
+  X a b -> X (a + 1) (not b)
