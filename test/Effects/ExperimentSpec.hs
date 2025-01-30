@@ -1,3 +1,5 @@
+{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE FlexibleContexts #-}
 module Effects.ExperimentSpec where
 
 import Effects.Experiment
@@ -6,6 +8,7 @@ import Test.MockCat
 import Prelude hiding (any)
 import Control.Monad.Hefty
 import Control.Category
+import Control.Monad.Hefty.Except
 
 spec :: Spec
 spec = do
@@ -65,3 +68,33 @@ spec = do
           x 100 True
 
       r `shouldBe` "100"
+
+    it "高階" do
+      xStub <- createStubFn $ (100 :: Int) |> True |> "100"
+      yStub <- createStubFn $ (200 :: Int) |> False |> "200"
+
+      r <- (
+        (interpretH \(HigherOrderEffect m) -> m)
+        >>> (interpret \(X i b) -> pure $ xStub i b)
+        >>> (interpret \(Y i b) -> pure $ yStub i b)
+        >>> runEff) higherOrderProgram
+
+      r `shouldBe` "100:200"
+    
+    it "" do
+      xStub <- createStubFn $ (100 :: Int) |> True |> "100"
+      r <- (
+        runExcept
+        >>> (interpret \(X i b) -> pure $ xStub i b)
+        >>> runEff) program
+      "" `shouldBe` ""
+
+newtype Error = Error String
+
+program :: (Catch Error <<: m, Throw Error <: m, X <: m, Monad m) => m String
+program = do
+  catch
+    (do
+      r <- x 100 True
+      if r == "100" then throw $ Error "error" else pure ())
+    (\(Error e) -> pure e)
