@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Effects.ExperimentSpec where
 
 import Effects.Experiment
@@ -11,6 +12,9 @@ import Prelude hiding (any)
 import Control.Monad.Hefty
 import Control.Category ( (>>>) )
 import Control.Monad.Hefty.Except
+import Control.Monad.Hefty.Resource
+import Control.Monad.Hefty.Unlift 
+import Control.Exception (Exception)
 
 spec :: Spec
 spec = do
@@ -114,9 +118,104 @@ spec = do
       case result of
         Left (CustomError e) -> e `shouldBe` "error"
         Right r -> expectationFailure $ "Unexpected Right: " ++ show r
+  {-
+     https://github.com/sayo-hs/data-effects/blob/master/data-effects/src/Data/Effect/Resource.hs
+     https://github.com/sayo-hs/heftia/blob/master/heftia-effects/src/Control/Monad/Hefty/Resource.hs
 
-newtype CustomError = CustomError { message :: String }
+     https://hackage.haskell.org/package/base-4.16.4.0/docs/Control-Exception.html#v:bracket
+     と同じセマンティクスを持つ。
+
+     リソースを割り当て、使用し、その後始末をする。
+     Bracket         :: f a -> (a -> f ()) -> (a -> f b) -> Resource f b
+     リソースを割り当て、それを使用し、エラーが発生した場合はその後にクリーンアップする。
+     BracketOnExcept :: f a -> (a -> f ()) -> (a -> f b) -> Resource f b
+
+     f a は最初に実行する計算 (acquire)
+     (a -> f ()) はリソースを解放する計算 (release/onException)
+     (a -> f b) はリソースを使って行う計算 (thing)
+
+     -- エフェクトUnliftIOとIOを制約に持ち、Resourceを除去する
+     runResourceIO :: (UnliftIO <<| eh, IO <| ef) => Eff (Resource ': eh) ef ~> Eff eh ef
+     -- MonadUnliftIOを制約に持ち、UnliftIOを除去する
+     runUnliftIO   :: (MonadUnliftIO m) => Eff '[UnliftIO] '[m] ~> m
+
+     runExcept :: Eff '[Catch e] (Throw e ': r) a -> Eff '[] r (Either e a)
+     
+  -}
+  describe "resource" do
+    it "bracket" do
+      xStub <- createStubFn $ (100 :: Int) |> True |> "100"
+      loggingMock <- createMock $ any @String |> pure @IO ()
+      let
+        p :: (Resource <<: m, X <: m, Logging <: m, Monad m) => m String
+        p = bracket
+          (do x 100 True)
+          (\v -> do
+            logging $ "release:" <> v
+            pure ())
+          (\v -> do
+            logging $ "thing:" <> v
+            pure v)
+      r <- (
+        (interpret \(X i b) -> pure $ xStub i b)
+        >>> (interpret \(Logging msg) -> liftIO $ stubFn loggingMock msg)
+        >>> runResourceIO
+        >>> runUnliftIO
+        ) p
+      r `shouldBe` "100"
+      loggingMock `shouldApplyInOrder` ["thing:100", "release:100"]
+
+    it "bracketOnExcept(例外が発生しない場合)" do
+      xStub <- createStubFn $ (100 :: Int) |> True |> "100"
+      loggingMock <- createMock $ any @String |> pure @IO ()
+      let
+        p :: (Resource <<: m, X <: m, Logging <: m, Monad m) => m String
+        p = bracketOnExcept
+          (do x 100 True)
+          (\v -> do
+            logging $ "onException:" <> v
+            pure ())
+          (\v -> do
+            logging $ "thing:" <> v
+            pure v)
+      r <- (
+        (interpret \(X i b) -> pure $ xStub i b)
+        >>> (interpret \(Logging msg) -> liftIO $ stubFn loggingMock msg)
+        >>> runResourceIO -- Eff '[Resource, UnliftIO] '[IO] String -> Eff '[UnliftIO] '[IO] String
+        >>> runUnliftIO   -- MonadUnliftIO m => Eff '[UnliftIO] '[m] ~> m
+        ) p
+      r `shouldBe` "100"
+      loggingMock `shouldApplyInOrder` ["thing:100"]
+
+    -- it "bracketOnExcept(例外が発生した場合)" do
+    --   xStub <- createStubFn $ (100 :: Int) |> True |> "100"
+    --   loggingMock <- createMock $ any @String |> pure @IO ()
+    --   let
+    --     p :: (Resource <<: m, X <: m, Catch CustomError <<: m, Throw CustomError <: m, Logging <: m, IO <: m, Monad m) => m String
+    --     p = bracketOnExcept
+    --       (do x 100 True)
+    --       (\v -> do
+    --         logging $ "onException:" <> v
+    --         pure ())
+    --       (\v -> do
+    --         logging $ "thing:" <> v
+    --         throw $ CustomError "error") `catch` (throw @CustomError)
+    --   r <- (
+    --     (interpret \(X i b) -> pure $ xStub i b)
+    --     >>> (interpret \(Logging msg) -> liftIO $ stubFn loggingMock msg)
+    --     >>> runThrowIO @CustomError
+    --     >>> runCatchIO @CustomError
+    --     >>> runResourceIO
+    --     >>> runUnliftIO) p
+    --   -- case r of
+    --   --   Left (CustomError e) -> e `shouldBe` "error"
+    --   --   Right r -> expectationFailure $ "Unexpected Right: " ++ show r
+    --   loggingMock `shouldApplyInOrder` ["thing:100"]
+
+newtype CustomError = CustomError String
   deriving (Show, Eq)
+  
+instance Exception CustomError
 
 throwableProgram :: (Catch CustomError <<: m, Throw CustomError <: m, X <: m, Monad m) => m String
 throwableProgram = do
