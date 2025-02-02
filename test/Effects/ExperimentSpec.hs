@@ -14,6 +14,9 @@ import Control.Monad.Hefty.Except
 
 spec :: Spec
 spec = do
+  {-
+    https://github.com/sayo-hs/heftia/blob/master/heftia/src/Control/Monad/Hefty/Transform.hs
+  -}
   describe "rwrite/transform/translateのテスト" do
     it "どれも使わない場合" do
       xStub <- createStubFn $ (100 :: Int) |> True |> "100"
@@ -87,13 +90,17 @@ spec = do
 
       r `shouldBe` "100:200 300:400"
 
+  {-
+    https://github.com/sayo-hs/data-effects/blob/master/data-effects/src/Data/Effect/Except.hs
+    https://github.com/sayo-hs/heftia/blob/master/heftia-effects/src/Control/Monad/Hefty/Except.hs
+  -}
   describe "catch/throwのテスト" do
     it "throwされない場合" do
       xStub <- createStubFn $ (100 :: Int) |> True |> "1"
       result <- (
         runExcept
         >>> (interpret \(X i b) -> pure $ xStub i b)
-        >>> runEff) program
+        >>> runEff) throwableProgram
       case result of
         Left (CustomError e) -> expectationFailure $ "Unexpected Left: " ++ show e
         Right r -> r `shouldBe` "1"
@@ -103,7 +110,7 @@ spec = do
       result <- (
         runExcept
         >>> (interpret \(X i b) -> pure $ xStub i b)
-        >>> runEff) program
+        >>> runEff) throwableProgram
       case result of
         Left (CustomError e) -> e `shouldBe` "error"
         Right r -> expectationFailure $ "Unexpected Right: " ++ show r
@@ -111,8 +118,8 @@ spec = do
 newtype CustomError = CustomError { message :: String }
   deriving (Show, Eq)
 
-program :: (Catch CustomError <<: m, Throw CustomError <: m, X <: m, Monad m) => m String
-program = do
+throwableProgram :: (Catch CustomError <<: m, Throw CustomError <: m, X <: m, Monad m) => m String
+throwableProgram = do
   catch
     (do
       r <- x 100 True
