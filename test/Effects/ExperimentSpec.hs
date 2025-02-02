@@ -70,8 +70,12 @@ spec = do
       r `shouldBe` "100"
 
     it "高階" do
-      xStub <- createStubFn $ (100 :: Int) |> True |> "100"
-      yStub <- createStubFn $ (200 :: Int) |> False |> "200"
+      xStub <- createStubFn do
+        onCase $ (100 :: Int) |> True |> "100"
+        onCase $ (300 :: Int) |> True |> "300"
+      yStub <- createStubFn do
+        onCase $ (200 :: Int) |> False |> "200"
+        onCase $ (400 :: Int) |> False |> "400"
 
       r <- (
         (interpretH \(HigherOrderEffect m) -> m)
@@ -79,22 +83,36 @@ spec = do
         >>> (interpret \(Y i b) -> pure $ yStub i b)
         >>> runEff) higherOrderProgram
 
-      r `shouldBe` "100:200"
+      r `shouldBe` "100:200 300:400"
     
     it "" do
-      xStub <- createStubFn $ (100 :: Int) |> True |> "100"
-      r <- (
+      xStub <- createStubFn $ (100 :: Int) |> True |> "1"
+      let 
+        x :: (Catch CustomError <<: m, Throw CustomError <: m, X <: m, Monad m) => m String
+        x = catch program (\(CustomError e) -> pure e)
+      result <- (
         runExcept
         >>> (interpret \(X i b) -> pure $ xStub i b)
-        >>> runEff) program
-      "" `shouldBe` ""
+        >>> runEff) x
+      case result of
+        Left (CustomError e) -> e `shouldBe` "error"
+        Right r -> r `shouldBe` "1"
 
-newtype Error = Error String
+data CustomError = CustomError String
 
-program :: (Catch Error <<: m, Throw Error <: m, X <: m, Monad m) => m String
+program :: (Throw CustomError <: m, X <: m, Monad m) => m String
 program = do
-  catch
-    (do
-      r <- x 100 True
-      if r == "100" then throw $ Error "error" else pure ())
-    (\(Error e) -> pure e)
+  r <- x 100 True
+  if r == "100" then 
+    throw $ CustomError "error"
+  else pure r
+
+-- program :: (Catch CustomError <<: m, Throw CustomError <: m, X <: m, Monad m) => m String
+-- program = do
+--   catch
+--     (do
+--       r <- x 100 True
+--       if r == "100" then 
+--         throw $ CustomError "error"
+--       else pure r)
+--     (\(CustomError e) -> CustomError e)
