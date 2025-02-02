@@ -1,5 +1,7 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 module Effects.ExperimentSpec where
 
 import Effects.Experiment
@@ -7,7 +9,7 @@ import Test.Hspec
 import Test.MockCat
 import Prelude hiding (any)
 import Control.Monad.Hefty
-import Control.Category
+import Control.Category ( (>>>) )
 import Control.Monad.Hefty.Except
 
 spec :: Spec
@@ -84,35 +86,41 @@ spec = do
         >>> runEff) higherOrderProgram
 
       r `shouldBe` "100:200 300:400"
-    
-    it "" do
+
+  describe "catch/throwのテスト" do
+    it "throwされない場合" do
       xStub <- createStubFn $ (100 :: Int) |> True |> "1"
-      let 
-        x :: (Catch CustomError <<: m, Throw CustomError <: m, X <: m, Monad m) => m String
-        x = catch program (\(CustomError e) -> pure e)
       result <- (
         runExcept
         >>> (interpret \(X i b) -> pure $ xStub i b)
-        >>> runEff) x
+        >>> runEff) program
       case result of
-        Left (CustomError e) -> e `shouldBe` "error"
+        Left (CustomError e) -> expectationFailure $ "Unexpected Left: " ++ show e
         Right r -> r `shouldBe` "1"
 
-data CustomError = CustomError String
+    it "throwされた場合" do
+      xStub <- createStubFn $ (100 :: Int) |> True |> "100"
+      result <- (
+        runExcept
+        >>> (interpret \(X i b) -> pure $ xStub i b)
+        >>> runEff) program
+      case result of
+        Left (CustomError e) -> e `shouldBe` "error"
+        Right r -> expectationFailure $ "Unexpected Right: " ++ show r
 
-program :: (Throw CustomError <: m, X <: m, Monad m) => m String
+newtype CustomError = CustomError { message :: String }
+  deriving (Show, Eq)
+
+program :: (Catch CustomError <<: m, Throw CustomError <: m, X <: m, Monad m) => m String
 program = do
-  r <- x 100 True
-  if r == "100" then 
-    throw $ CustomError "error"
-  else pure r
-
--- program :: (Catch CustomError <<: m, Throw CustomError <: m, X <: m, Monad m) => m String
--- program = do
---   catch
---     (do
---       r <- x 100 True
---       if r == "100" then 
---         throw $ CustomError "error"
---       else pure r)
---     (\(CustomError e) -> CustomError e)
+  catch
+    (do
+      r <- x 100 True
+      if r == "100" then
+        throw $ CustomError "error"
+      else pure r)
+    (throw @CustomError) -- 特に何もせずに例外を投げなおすだけのハンドラ
+    -- ^ 例外ハンドラはいずれかの方法でエラー型を明示する必要がある
+--  (\(CustomError e) -> throw $ CustomError e)
+--  (\(e :: CustomError) -> throw e)
+--  (\e -> throw (e :: CustomError))
