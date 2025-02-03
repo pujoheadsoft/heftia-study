@@ -2,7 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 module Effects.ExperimentSpec where
 
 import Effects.Experiment
@@ -12,11 +12,11 @@ import Prelude hiding (any)
 import Control.Monad.Hefty
 import Control.Category ( (>>>) )
 import Control.Monad.Hefty.Except
-    ( catch, throw, runExcept, Catch, Throw, runThrowIO, runCatchIO, runThrow )
+    ( catch, throw, runExcept, Catch, Throw, runThrowIO )
 import Control.Monad.Hefty.Resource
     ( bracket, bracketOnExcept, runResourceIO, Resource )
-import Control.Monad.Hefty.Unlift ( runUnliftIO ) 
-import Control.Exception (Exception, throwIO, evaluate, try)
+import Control.Monad.Hefty.Unlift ( runUnliftIO )
+import Control.Exception (Exception)
 
 spec :: Spec
 spec = do
@@ -104,7 +104,7 @@ spec = do
     it "throwされない場合" do
       xStub <- createStubFn $ (100 :: Int) |> True |> "1"
       result <- (
-        runExcept
+        Control.Monad.Hefty.Except.runExcept
         >>> (interpret \(X i b) -> pure $ xStub i b)
         >>> runEff) throwableProgram
       case result of
@@ -114,7 +114,7 @@ spec = do
     it "throwされた場合" do
       xStub <- createStubFn $ (100 :: Int) |> True |> "100"
       result <- (
-        runExcept
+        Control.Monad.Hefty.Except.runExcept
         >>> (interpret \(X i b) -> pure $ xStub i b)
         >>> runEff) throwableProgram
       case result of
@@ -140,12 +140,10 @@ spec = do
      runResourceIO :: (UnliftIO <<| eh, IO <| ef) => Eff (Resource ': eh) ef ~> Eff eh ef
      -- MonadUnliftIOを制約に持ち、UnliftIOを除去する
      runUnliftIO   :: (MonadUnliftIO m) => Eff '[UnliftIO] '[m] ~> m
-
-     runExcept :: Eff '[Catch e] (Throw e ': r) a -> Eff '[] r (Either e a)
      
   -}
   describe "resource" do
-    it "bracket" do
+    it "bracket(例外が発生しない場合、リリースの処理が呼ばれる)" do
       xStub <- createStubFn $ (100 :: Int) |> True |> "100"
       loggingMock <- createMock $ any @String |> pure @IO ()
       let
@@ -167,7 +165,29 @@ spec = do
       r `shouldBe` "100"
       loggingMock `shouldApplyInOrder` ["thing:100", "release:100"]
 
-    it "bracketOnExcept(例外が発生しない場合)" do
+    it "bracket(例外が発生した場合でもリリースの処理が呼ばれる)" do
+      xStub <- createStubFn $ (100 :: Int) |> True |> "100"
+      loggingMock <- createMock $ any @String |> pure @IO ()
+      let
+        p :: (Resource <<: m, X <: m, Logging <: m, Monad m, Control.Monad.Hefty.Except.Throw CustomError <: m) => m String
+        p = bracket
+          (do x 100 True)
+          (\v -> do
+            logging $ "release:" <> v
+            pure ())
+          (\v -> do
+            logging $ "thing:" <> v
+            Control.Monad.Hefty.Except.throw $ CustomError "error")
+        run = Control.Monad.Hefty.Except.runThrowIO @CustomError
+          >>> (interpret \(X i b) -> pure $ xStub i b)
+          >>> (interpret \(Logging msg) -> liftIO $ stubFn loggingMock msg)
+          >>> runResourceIO
+          >>> runUnliftIO
+
+      run p `shouldThrow` (== CustomError "error")
+      loggingMock `shouldApplyInOrder` ["thing:100", "release:100"]
+
+    it "bracketOnExcept(例外が発生しない場合、リリースの処理は呼ばれない)" do
       xStub <- createStubFn $ (100 :: Int) |> True |> "100"
       loggingMock <- createMock $ any @String |> pure @IO ()
       let
@@ -180,55 +200,51 @@ spec = do
           (\v -> do
             logging $ "thing:" <> v
             pure v)
-      r <- (
-        (interpret \(X i b) -> pure $ xStub i b)
-        >>> (interpret \(Logging msg) -> liftIO $ stubFn loggingMock msg)
-        >>> runResourceIO -- Eff '[Resource, UnliftIO] '[IO] String -> Eff '[UnliftIO] '[IO] String
-        >>> runUnliftIO   -- MonadUnliftIO m => Eff '[UnliftIO] '[m] ~> m
-        ) p
-      r `shouldBe` "100"
-      loggingMock `shouldApplyInOrder` ["thing:100"]
+        run = (interpret \(X i b) -> pure $ xStub i b)
+          >>> (interpret \(Logging msg) -> liftIO $ stubFn loggingMock msg)
+          >>> runResourceIO -- Eff '[Resource, UnliftIO] '[IO] String -> Eff '[UnliftIO] '[IO] String
+          >>> runUnliftIO   -- MonadUnliftIO m => Eff '[UnliftIO] '[m] ~> m
 
-    it "bracketOnExcept(例外が発生した場合)" do
+      r <- run p
+      r `shouldBe` "100"
+      loggingMock `shouldApplyInOrder` ["thing:100"] -- onExceptionは呼ばれない
+
+    it "bracketOnExcept(例外が発生した場合、リリースの処理が呼ばれる)" do
       xStub <- createStubFn $ (100 :: Int) |> True |> "100"
       loggingMock <- createMock $ any @String |> pure @IO ()
       let
-        p :: (Resource <<: m, X <: m, Logging <: m, IO <: m, Monad m, Throw CustomError <: m) => m String
+        p :: (Resource <<: m, X <: m, Logging <: m, Monad m, Control.Monad.Hefty.Except.Throw CustomError <: m) => m String
         p = bracketOnExcept
           (do x 100 True)
           (\v -> do
-            logging $ "onException!!!!!!!!!!!!!:" <> v
+            logging $ "onException:" <> v
             pure ())
           (\v -> do
-            logging $ "thing!!!!!!!!!!!!!!!!!!:" <> v
-            --error "error"
-            throw $ CustomError "error"
-            pure v
-            )
-        y = (runThrowIO @CustomError
+            logging $ "thing:" <> v
+            Control.Monad.Hefty.Except.throw $ CustomError "error")
+        run = Control.Monad.Hefty.Except.runThrowIO @CustomError
           >>> (interpret \(X i b) -> pure $ xStub i b)
-          >>> (interpret \(Logging msg) -> liftIO $ putStrLn msg)
-          >>> runResourceIO) p
-      r <- try (runUnliftIO y)
-      r `shouldBe` Left (CustomError "error")
-      print "@@@@@@"
+          >>> (interpret \(Logging msg) -> liftIO $ stubFn loggingMock msg)
+          >>> runResourceIO
+          >>> runUnliftIO
 
-      --loggingMock `shouldApplyInOrder` ["thing:100"]
+      run p `shouldThrow` (== CustomError "error")
+      loggingMock `shouldApplyInOrder` ["thing:100", "onException:100"]
 
 newtype CustomError = CustomError String
   deriving (Show, Eq)
-  
+
 instance Exception CustomError
 
-throwableProgram :: (Catch CustomError <<: m, Throw CustomError <: m, X <: m, Monad m) => m String
+throwableProgram :: (Control.Monad.Hefty.Except.Catch CustomError <<: m, Control.Monad.Hefty.Except.Throw CustomError <: m, X <: m, Monad m) => m String
 throwableProgram = do
-  catch
+  Control.Monad.Hefty.Except.catch
     (do
       r <- x 100 True
       if r == "100" then
-        throw $ CustomError "error"
+        Control.Monad.Hefty.Except.throw $ CustomError "error"
       else pure r)
-    (throw @CustomError) -- 特に何もせずに例外を投げなおすだけのハンドラ
+    (Control.Monad.Hefty.Except.throw @CustomError) -- 特に何もせずに例外を投げなおすだけのハンドラ
     -- ^ 例外ハンドラはいずれかの方法でエラー型を明示する必要がある
 --  (\(CustomError e) -> throw $ CustomError e)
 --  (\(e :: CustomError) -> throw e)
